@@ -6,6 +6,7 @@ use tabled::Table;
 use super::CommandBase;
 
 #[derive(Parser)]
+#[derive(Debug)]
 #[command(
     author,
     version,
@@ -31,19 +32,21 @@ impl Orgs {
 }
 
 #[derive(Subcommand)]
+#[derive(Debug)]
 pub enum Commands {
     List(List),
     Create(Create),
 }
 
 #[derive(Parser)]
+#[derive(Debug)]
 pub struct List {}
 
 impl List {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
             .user_config()?
-            .token()
+            .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let response = base.api_client()?.get_organizations(token)?;
@@ -56,6 +59,7 @@ impl List {
 }
 
 #[derive(Parser)]
+#[derive(Debug)]
 pub struct Create {
     #[clap(short, long)]
     name: Option<String>,
@@ -68,7 +72,7 @@ impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
             .user_config()?
-            .token()
+            .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let plan = CreatePlan::builder()

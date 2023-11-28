@@ -29,11 +29,12 @@ impl CommandBase {
     }
 
     pub fn api_client(&self) -> Result<APIClient> {
-        Ok(APIClient::new("http://localhost:8000"))
+        let host = self.user_config()?.get_host();
+        Ok(APIClient::new(host))
     }
 
     fn user_config_init(&self) -> Result<UserConfig, Error> {
-        UserConfigLoader::new(default_user_config_path()?).load()
+        UserConfigLoader::load(&default_user_config_path()?)
     }
 
     pub fn user_config(&self) -> Result<&UserConfig, Error> {

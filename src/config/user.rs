@@ -1,18 +1,26 @@
 use camino::Utf8PathBuf;
 use config::Config;
 
-use super::{write_to_disk_json, Error};
+use crate::Cli;
 
-#[derive(Debug)]
+use super::{default_user_config_path, write_to_disk_json, Error};
+
+#[derive(Debug, Clone)]
 pub struct UserConfig {
-    pub config: UserConfigInner,
-    pub disk_config: UserConfigInner,
-    pub path: Utf8PathBuf,
+    config: UserConfigInner,
+    disk_config: UserConfigInner,
+    path: Utf8PathBuf,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct UserConfigInner {
-    pub token: Option<Token>,
+    token: Option<Token>,
+    #[serde(default = "default_host")]
+    host: String,
+}
+
+fn default_host() -> String {
+    "api.molnett.org".to_string()
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -37,26 +45,41 @@ pub struct UserConfigLoader {
 }
 
 impl UserConfig {
-    pub fn token(&self) -> Option<&str> {
+    pub fn new(cli: &Cli) -> Self {
+        let config_path = match &cli.config {
+            Some(path) => path.clone(),
+            None => default_user_config_path().expect("No config path provided and default path not found"),
+        };
+        let mut config = UserConfigLoader::load(&config_path).expect("Loading config from disk failed");
+
+        if let Some(h) = &cli.host {
+            config.set_host(h.to_string());
+        }
+
+        config
+    }
+    pub fn get_token(&self) -> Option<&str> {
         self.config.token.as_ref().map(|u| u.access_token.as_str())
     }
-    pub fn set_token(&mut self, token: Token) -> Result<(), super::Error> {
+    pub fn write_token(&mut self, token: Token) -> Result<(), super::Error> {
         self.disk_config.token = Some(token.clone());
         self.config.token = Some(token);
 
         write_to_disk_json(&self.path, &self.disk_config)
     }
+    pub fn get_host(&self) -> &str {
+        self.config.host.as_ref()
+    }
+    fn set_host(&mut self, host: String) {
+        self.config.host = host;
+    }
 }
 
 impl UserConfigLoader {
-    pub fn new(path: impl Into<Utf8PathBuf>) -> Self {
-        Self { path: path.into() }
-    }
-
-    pub fn load(self) -> Result<UserConfig, Error> {
+    pub fn load(path: &Utf8PathBuf) -> Result<UserConfig, Error> {
         let disk_config = Config::builder()
             .add_source(
-                config::File::with_name(self.path.as_str())
+                config::File::with_name(path.as_str())
                     .format(config::FileFormat::Json)
                     .required(false),
             )
@@ -67,7 +90,7 @@ impl UserConfigLoader {
         Ok(UserConfig {
             config: config.try_deserialize()?,
             disk_config: disk_config.try_deserialize()?,
-            path: self.path,
+            path: path.clone(),
         })
     }
 }
