@@ -20,9 +20,7 @@ pub struct Orgs {
 }
 
 impl Orgs {
-    pub fn execute(&self) -> Result<()> {
-        let base = CommandBase::new();
-
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
         match &self.command {
             Some(Commands::List(list)) => list.execute(&base),
             Some(Commands::Create(create)) => create.execute(&base),
@@ -45,7 +43,7 @@ pub struct List {}
 impl List {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
-            .user_config()?
+            .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
@@ -71,7 +69,7 @@ pub struct Create {
 impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
-            .user_config()?
+            .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
@@ -104,8 +102,8 @@ struct CreatePlanBuilder {
 }
 
 impl CreatePlanBuilder {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> CreatePlanBuilder {
+        CreatePlanBuilder {
             name: "".to_string(),
             billing_email: "".to_string(),
         }

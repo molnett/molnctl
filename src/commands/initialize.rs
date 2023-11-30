@@ -36,7 +36,7 @@ impl Initialize {
         }
 
         let _token = base
-            .user_config()?
+            .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
@@ -88,7 +88,7 @@ struct InitPlan {
 }
 
 struct InitPlanBuilder<'a> {
-    base: &'a CommandBase,
+    base: &'a CommandBase<'a>,
 
     app_name: String,
     organization_id: String,
@@ -101,9 +101,9 @@ struct InitPlanBuilder<'a> {
     application_type: ApplicationType,
 }
 
-impl<'a> InitPlanBuilder<'a> {
-    pub fn new(base: &'a CommandBase) -> Self {
-        Self {
+impl InitPlanBuilder<'_> {
+    pub fn new<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
+        InitPlanBuilder {
             base,
             app_name: "".to_string(),
             organization_id: "".to_string(),
@@ -140,7 +140,7 @@ impl<'a> InitPlanBuilder<'a> {
             .base
             .api_client()
             .unwrap()
-            .get_organizations(self.base.user_config().unwrap().get_token().unwrap())
+            .get_organizations(self.base.user_config().get_token().unwrap())
             .unwrap();
 
         let org_ids = orgs
@@ -229,7 +229,7 @@ impl<'a> InitPlanBuilder<'a> {
 }
 
 impl InitPlan {
-    pub fn builder(base: &CommandBase) -> InitPlanBuilder {
+    pub fn builder<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
         InitPlanBuilder::new(base)
     }
 }

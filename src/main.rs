@@ -47,15 +47,13 @@ fn main() -> Result<()> {
     println!("MyObject: {:?}", cli);
 
     // load or write default config file
-    let config = UserConfig::new(&cli);
+    let mut config = UserConfig::new(&cli);
     println!("Config: {:?}", config);
 
-    // overwrite some options if certain env variables are defined
-
-    let mut base = CommandBase::new();
+    let mut base = CommandBase::new(&mut config);
 
     match cli.command {
-        Some(Commands::Orgs(orgs)) => orgs.execute(),
+        Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
         Some(Commands::Test) => Ok(()),

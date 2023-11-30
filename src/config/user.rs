@@ -48,9 +48,11 @@ impl UserConfig {
     pub fn new(cli: &Cli) -> Self {
         let config_path = match &cli.config {
             Some(path) => path.clone(),
-            None => default_user_config_path().expect("No config path provided and default path not found"),
+            None => default_user_config_path()
+                .expect("No config path provided and default path not found"),
         };
-        let mut config = UserConfigLoader::load(&config_path).expect("Loading config from disk failed");
+        let mut config =
+            UserConfigLoader::load(&config_path).expect("Loading config from disk failed");
 
         if let Some(h) = &cli.host {
             config.set_host(h.to_string());

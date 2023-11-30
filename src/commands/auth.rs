@@ -66,7 +66,7 @@ impl Auth {
                     Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
             }
 
-            base.user_config_mut()?.write_token(token)?;
+            base.user_config_mut().write_token(token)?;
 
             request.respond(Response::from_string("Success!"))?;
 
