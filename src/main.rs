@@ -7,6 +7,7 @@ mod api;
 mod commands;
 mod config;
 
+
 #[derive(Debug)]
 #[derive(Parser)]
 #[command(
@@ -21,8 +22,8 @@ struct Cli {
     #[arg(short, long, value_name = "FILE", env("MOLNETT_CONFIG"))]
     config: Option<Utf8PathBuf>,
 
-    #[arg(long, env("MOLNETT_HOST"))]
-    host: Option<String>,
+    #[arg(long, env("MOLNETT_API_URL"), help = "Url of the Molnett API, default is https://api.molnett.org")]
+    url: Option<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,

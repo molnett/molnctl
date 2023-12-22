@@ -25,8 +25,7 @@ impl APIClient {
     ) -> Result<ListOrganizationResponse, reqwest::Error> {
         let url = format!("{}/organization", self.base_url);
 
-        let response = self
-            .client
+        let response = self.client
             .get(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))

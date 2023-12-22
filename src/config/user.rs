@@ -15,12 +15,12 @@ pub struct UserConfig {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct UserConfigInner {
     token: Option<Token>,
-    #[serde(default = "default_host")]
-    host: String,
+    #[serde(default = "default_url")]
+    url: String,
 }
 
-fn default_host() -> String {
-    "api.molnett.org".to_string()
+fn default_url() -> String {
+    "https://api.molnett.org".to_string()
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -54,8 +54,10 @@ impl UserConfig {
         let mut config =
             UserConfigLoader::load(&config_path).expect("Loading config from disk failed");
 
-        if let Some(h) = &cli.host {
-            config.set_host(h.to_string());
+        // TODO: write config to disk after reading so it gets written if it doesn't exist
+
+        if let Some(h) = &cli.url {
+            config.set_url(h.to_string());
         }
 
         config
@@ -69,11 +71,11 @@ impl UserConfig {
 
         write_to_disk_json(&self.path, &self.disk_config)
     }
-    pub fn get_host(&self) -> &str {
-        self.config.host.as_ref()
+    pub fn get_url(&self) -> &str {
+        self.config.url.as_ref()
     }
-    fn set_host(&mut self, host: String) {
-        self.config.host = host;
+    fn set_url(&mut self, url: String) {
+        self.config.url = url;
     }
 }
 

@@ -18,22 +18,25 @@ pub struct Auth {}
 impl Auth {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         let server = Server::http("localhost:0").unwrap();
+        let local_port = server.server_addr().to_ip().unwrap().port();
+        let redirect_uri = format!("http://localhost:{}/oauth2/callback", local_port);
 
+        let url = base.user_config().get_url();
         let client = BasicClient::new(
-            ClientId::new("60c03580-f2c1-4c67-bde8-57463c7d8c47".to_string()),
+            ClientId::new("124a489e-93f7-4dd6-abae-1ed4c692bdc7".to_string()),
             None,
-            AuthUrl::new("http://localhost:8000/oauth2/auth".to_string()).unwrap(),
-            Some(TokenUrl::new("http://localhost:8000/oauth2/token".to_string()).unwrap()),
+            AuthUrl::new(format!("{}/oauth2/auth", url)).unwrap(),
+            Some(TokenUrl::new(format!("{}/oauth2/token", url)).unwrap()),
         )
         .set_redirect_uri(
-            oauth2::RedirectUrl::new("http://localhost:8000/oauth2/callback".to_string()).unwrap(),
+            oauth2::RedirectUrl::new(redirect_uri).unwrap(),
         );
 
         let (pkce_code_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
         let state = format!(
             "http://localhost:{}/oauth/callback",
-            server.server_addr().to_ip().unwrap().port()
+            local_port
         );
 
         let (auth_url, _) = client
