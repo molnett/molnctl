@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use dialoguer::{FuzzySelect, Input};
+use dialoguer::Input;
 use tabled::Table;
 
 use super::CommandBase;
@@ -71,7 +71,7 @@ impl Create {
             .token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let mut plan = CreatePlan::builder(base)
+        let plan = CreatePlan::builder()
             .name(self.name.as_deref())
             .billing_email(self.billing_email.as_deref())
             .build()?;
@@ -94,17 +94,14 @@ struct CreatePlan {
     billing_email: String,
 }
 
-struct CreatePlanBuilder<'a> {
-    base: &'a CommandBase,
-
+struct CreatePlanBuilder {
     name: String,
     billing_email: String,
 }
 
-impl<'a> CreatePlanBuilder<'a> {
-    pub fn new(base: &'a CommandBase) -> Self {
+impl CreatePlanBuilder {
+    pub fn new() -> Self {
         Self {
-            base,
             name: "".to_string(),
             billing_email: "".to_string(),
         }
@@ -156,7 +153,7 @@ impl<'a> CreatePlanBuilder<'a> {
 }
 
 impl CreatePlan {
-    pub fn builder(base: &CommandBase) -> CreatePlanBuilder {
-        CreatePlanBuilder::new(base)
+    pub fn builder() -> CreatePlanBuilder {
+        CreatePlanBuilder::new()
     }
 }

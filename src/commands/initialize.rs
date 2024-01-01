@@ -1,6 +1,13 @@
+use std::path::Path;
+
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use dialoguer::{FuzzySelect, Input};
+
+use crate::config::{
+    application::{Build, HttpService},
+    scan::{scan_directory_for_type, ApplicationType},
+};
 
 use super::CommandBase;
 
@@ -23,20 +30,44 @@ pub struct Initialize {
 
 impl Initialize {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        let token = base
-            .user_config()?
+        base.user_config()?
             .token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let mut init_plan = InitPlan::builder(base)
-            .app_name(self.app_name.as_deref())
+        let app_config = base.app_config()?;
+        if app_config.name().is_some() {
+            return Err(anyhow!("App already initialized"));
+        }
+
+        let init_plan = InitPlan::builder(base)
             .organization_id(self.organization_id.as_deref())
+            .app_name(self.app_name.as_deref())
             .cpus(self.cpus)
             .memory_mb(self.memory_mb)
-            .build();
+            .determine_docker_image_path()
+            .determine_application_type()
+            .build()?;
+
+        let app_config = base.app_config_mut()?;
+
+        app_config.set_name(init_plan.app_name)?;
+        app_config.set_http_service(HttpService::new(8080, None))?;
+        app_config.set_build_config(Build::new(Some(init_plan.docker_file_path), None))?;
+
+        if let ApplicationType::Rust = init_plan.application_type {
+            app_config.set_build_config(Build::new(Some("Dockerfile".to_string()), None))?;
+
+            let dockerfile = Path::new("Dockerfile");
+            if !dockerfile.exists() {
+                std::fs::write(dockerfile, "")?;
+                let template = Path::new("../config/templates/Dockerfile.rust");
+
+                std::fs::copy(template, dockerfile)?;
+            }
+        }
 
         println!("Creating app...");
-        println!("{:#?}", init_plan);
+        println!("{:#?}", app_config);
 
         Ok(())
     }
@@ -49,6 +80,9 @@ struct InitPlan {
 
     cpus: u8,
     memory_mb: usize,
+
+    docker_file_path: String,
+    application_type: ApplicationType,
 }
 
 struct InitPlanBuilder<'a> {
@@ -59,6 +93,10 @@ struct InitPlanBuilder<'a> {
 
     cpus: u8,
     memory_mb: usize,
+
+    docker_file_path: String,
+
+    application_type: ApplicationType,
 }
 
 impl<'a> InitPlanBuilder<'a> {
@@ -69,6 +107,8 @@ impl<'a> InitPlanBuilder<'a> {
             organization_id: "".to_string(),
             cpus: 0,
             memory_mb: 0,
+            docker_file_path: "".to_string(),
+            application_type: ApplicationType::Unknown,
         }
     }
 
@@ -101,6 +141,9 @@ impl<'a> InitPlanBuilder<'a> {
             .get_organizations(self.base.user_config().unwrap().token().unwrap())
             .unwrap();
 
+        let a = 0
+
+
         let org_ids = orgs
             .organizations
             .iter()
@@ -130,6 +173,31 @@ impl<'a> InitPlanBuilder<'a> {
         self
     }
 
+    pub fn determine_docker_image_path(mut self) -> Self {
+        let docker_file_exists = Path::new("Dockerfile").exists();
+        if docker_file_exists {
+            self.docker_file_path = "Dockerfile".to_string();
+            return self;
+        }
+
+        let prompt = "Could not find Dockerfile in current working directory. Please enter the relative path to your Dockerfile: ";
+        let input: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt(prompt)
+            .interact_text()
+            .unwrap();
+
+        self.docker_file_path = input;
+
+        self
+    }
+
+    pub fn determine_application_type(mut self) -> Self {
+        let application_type = scan_directory_for_type();
+
+        self.application_type = application_type;
+        self
+    }
+
     fn verify(&self) -> Result<()> {
         let max_memory_limit = self.cpus as usize * 8192;
         let min_memory_limit = self.cpus as usize * 2048;
@@ -155,6 +223,8 @@ impl<'a> InitPlanBuilder<'a> {
             organization_id: self.organization_id,
             cpus: self.cpus,
             memory_mb: self.memory_mb,
+            docker_file_path: self.docker_file_path,
+            application_type: self.application_type,
         })
     }
 }

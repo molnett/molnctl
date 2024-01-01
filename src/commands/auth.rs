@@ -6,7 +6,7 @@ use oauth2::{
 };
 use tiny_http::{Response, Server};
 
-use crate::config::config::Token;
+use crate::config::user::Token;
 
 use super::CommandBase;
 

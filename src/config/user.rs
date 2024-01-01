@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use config::Config;
 
-use super::{write_to_disk, Error};
+use super::{write_to_disk_json, Error};
 
 #[derive(Debug)]
 pub struct UserConfig {
@@ -44,7 +44,7 @@ impl UserConfig {
         self.disk_config.token = Some(token.clone());
         self.config.token = Some(token);
 
-        write_to_disk(&self.path, &self.disk_config)
+        write_to_disk_json(&self.path, &self.disk_config)
     }
 }
 
