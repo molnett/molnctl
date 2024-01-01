@@ -42,15 +42,10 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(config_path) = cli.config.as_deref() {
-        println!("Value for config: {}", config_path.to_string());
+        println!("Config path: {}", config_path.to_string());
     }
 
-    println!("MyObject: {:?}", cli);
-
-    // load or write default config file
     let mut config = UserConfig::new(&cli);
-    println!("Config: {:?}", config);
-
     let mut base = CommandBase::new(&mut config);
 
     match cli.command {

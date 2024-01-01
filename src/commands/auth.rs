@@ -35,7 +35,7 @@ impl Auth {
         let (pkce_code_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
         let state = format!(
-            "http://localhost:{}/oauth/callback",
+            "http://localhost:{}/oauth2/callback",
             local_port
         );
 
@@ -64,6 +64,7 @@ impl Auth {
             if let Some(refresh_token) = oauthtoken.refresh_token() {
                 token.refresh_token = Some(refresh_token.secret().to_string());
             }
+            // TODO: the api returns "expiry":"2024-01-01T11:03:53.485518152+01:00"
             if let Some(expires_in) = oauthtoken.expires_in() {
                 token.expiry =
                     Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
@@ -71,7 +72,7 @@ impl Auth {
 
             base.user_config_mut().write_token(token)?;
 
-            request.respond(Response::from_string("Success!"))?;
+            request.respond(Response::from_string("Success! You can close this tab now"))?;
 
             return Ok(());
         }
