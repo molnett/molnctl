@@ -29,18 +29,13 @@ impl Auth {
             Some(TokenUrl::new(format!("{}/oauth2/token", url)).unwrap()),
         )
         .set_redirect_uri(
-            oauth2::RedirectUrl::new(redirect_uri).unwrap(),
+            oauth2::RedirectUrl::new(redirect_uri.clone()).unwrap(),
         );
 
         let (pkce_code_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
-        let state = format!(
-            "http://localhost:{}/oauth2/callback",
-            local_port
-        );
-
         let (auth_url, _) = client
-            .authorize_url(|| CsrfToken::new(state.clone()))
+            .authorize_url(|| CsrfToken::new(redirect_uri)) // TODO: create state and verify it instead of using redirect uri
             .set_pkce_challenge(pkce_code_challenge)
             .url();
 
