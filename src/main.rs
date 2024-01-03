@@ -35,7 +35,6 @@ enum Commands {
     Orgs(commands::orgs::Orgs),
     Auth(commands::auth::Auth),
     Initialize(commands::initialize::Initialize),
-    Test
 }
 
 fn main() -> Result<()> {
@@ -52,7 +51,6 @@ fn main() -> Result<()> {
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
-        Some(Commands::Test) => Ok(()),
         None => Ok(()),
     }
 }
