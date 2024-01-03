@@ -11,32 +11,31 @@ use crate::config::user::Token;
 use super::CommandBase;
 
 #[derive(Parser)]
+#[derive(Debug)]
 #[command(author, version, about, long_about)]
 pub struct Auth {}
 
 impl Auth {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         let server = Server::http("localhost:0").unwrap();
+        let local_port = server.server_addr().to_ip().unwrap().port();
+        let redirect_uri = format!("http://localhost:{}/oauth2/callback", local_port);
 
+        let url = base.user_config().get_url();
         let client = BasicClient::new(
-            ClientId::new("60c03580-f2c1-4c67-bde8-57463c7d8c47".to_string()),
+            ClientId::new("124a489e-93f7-4dd6-abae-1ed4c692bdc7".to_string()),
             None,
-            AuthUrl::new("http://localhost:8000/oauth2/auth".to_string()).unwrap(),
-            Some(TokenUrl::new("http://localhost:8000/oauth2/token".to_string()).unwrap()),
+            AuthUrl::new(format!("{}/oauth2/auth", url)).unwrap(),
+            Some(TokenUrl::new(format!("{}/oauth2/token", url)).unwrap()),
         )
         .set_redirect_uri(
-            oauth2::RedirectUrl::new("http://localhost:8000/oauth2/callback".to_string()).unwrap(),
+            oauth2::RedirectUrl::new(redirect_uri.clone()).unwrap(),
         );
 
         let (pkce_code_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
-        let state = format!(
-            "http://localhost:{}/oauth/callback",
-            server.server_addr().to_ip().unwrap().port()
-        );
-
         let (auth_url, _) = client
-            .authorize_url(|| CsrfToken::new(state.clone()))
+            .authorize_url(|| CsrfToken::new(redirect_uri)) // TODO: create state and verify it instead of using redirect uri
             .set_pkce_challenge(pkce_code_challenge)
             .url();
 
@@ -60,14 +59,15 @@ impl Auth {
             if let Some(refresh_token) = oauthtoken.refresh_token() {
                 token.refresh_token = Some(refresh_token.secret().to_string());
             }
+            // TODO: the api returns "expiry":"2024-01-01T11:03:53.485518152+01:00"
             if let Some(expires_in) = oauthtoken.expires_in() {
                 token.expiry =
                     Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
             }
 
-            base.user_config_mut()?.set_token(token)?;
+            base.user_config_mut().write_token(token)?;
 
-            request.respond(Response::from_string("Success!"))?;
+            request.respond(Response::from_string("Success! You can close this tab now"))?;
 
             return Ok(());
         }

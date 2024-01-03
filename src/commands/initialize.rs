@@ -30,16 +30,18 @@ pub struct Initialize {
 
 impl Initialize {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        base.user_config()?
-            .token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
-
         let app_config = base.app_config()?;
         if app_config.name().is_some() {
             return Err(anyhow!("App already initialized"));
         }
 
+        let _token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
         let init_plan = InitPlan::builder(base)
+            .app_name(self.app_name.as_deref())
             .organization_id(self.organization_id.as_deref())
             .app_name(self.app_name.as_deref())
             .cpus(self.cpus)
@@ -86,7 +88,7 @@ struct InitPlan {
 }
 
 struct InitPlanBuilder<'a> {
-    base: &'a CommandBase,
+    base: &'a CommandBase<'a>,
 
     app_name: String,
     organization_id: String,
@@ -99,9 +101,9 @@ struct InitPlanBuilder<'a> {
     application_type: ApplicationType,
 }
 
-impl<'a> InitPlanBuilder<'a> {
-    pub fn new(base: &'a CommandBase) -> Self {
-        Self {
+impl InitPlanBuilder<'_> {
+    pub fn new<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
+        InitPlanBuilder {
             base,
             app_name: "".to_string(),
             organization_id: "".to_string(),
@@ -138,11 +140,8 @@ impl<'a> InitPlanBuilder<'a> {
             .base
             .api_client()
             .unwrap()
-            .get_organizations(self.base.user_config().unwrap().token().unwrap())
+            .get_organizations(self.base.user_config().get_token().unwrap())
             .unwrap();
-
-        let a = 0
-
 
         let org_ids = orgs
             .organizations
@@ -230,7 +229,7 @@ impl<'a> InitPlanBuilder<'a> {
 }
 
 impl InitPlan {
-    pub fn builder(base: &CommandBase) -> InitPlanBuilder {
+    pub fn builder<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
         InitPlanBuilder::new(base)
     }
 }

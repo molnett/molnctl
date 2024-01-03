@@ -6,6 +6,7 @@ use tabled::Table;
 use super::CommandBase;
 
 #[derive(Parser)]
+#[derive(Debug)]
 #[command(
     author,
     version,
@@ -19,9 +20,7 @@ pub struct Orgs {
 }
 
 impl Orgs {
-    pub fn execute(&self) -> Result<()> {
-        let base = CommandBase::new();
-
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
         match &self.command {
             Some(Commands::List(list)) => list.execute(&base),
             Some(Commands::Create(create)) => create.execute(&base),
@@ -31,19 +30,21 @@ impl Orgs {
 }
 
 #[derive(Subcommand)]
+#[derive(Debug)]
 pub enum Commands {
     List(List),
     Create(Create),
 }
 
 #[derive(Parser)]
+#[derive(Debug)]
 pub struct List {}
 
 impl List {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
-            .user_config()?
-            .token()
+            .user_config()
+            .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let response = base.api_client()?.get_organizations(token)?;
@@ -56,6 +57,7 @@ impl List {
 }
 
 #[derive(Parser)]
+#[derive(Debug)]
 pub struct Create {
     #[clap(short, long)]
     name: Option<String>,
@@ -67,8 +69,8 @@ pub struct Create {
 impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
         let token = base
-            .user_config()?
-            .token()
+            .user_config()
+            .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let plan = CreatePlan::builder()
@@ -100,8 +102,8 @@ struct CreatePlanBuilder {
 }
 
 impl CreatePlanBuilder {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> CreatePlanBuilder {
+        CreatePlanBuilder {
             name: "".to_string(),
             billing_email: "".to_string(),
         }

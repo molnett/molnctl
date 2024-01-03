@@ -1,10 +1,14 @@
 use anyhow::Result;
+use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
+use crate::config::user::UserConfig;
 use commands::CommandBase;
 mod api;
 mod commands;
 mod config;
 
+
+#[derive(Debug)]
 #[derive(Parser)]
 #[command(
     author,
@@ -15,10 +19,17 @@ mod config;
     arg_required_else_help = true
 )]
 struct Cli {
+    #[arg(short, long, value_name = "FILE", env("MOLNETT_CONFIG"))]
+    config: Option<Utf8PathBuf>,
+
+    #[arg(long, env("MOLNETT_API_URL"), help = "Url of the Molnett API, default is https://api.molnett.org")]
+    url: Option<String>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
+#[derive(Debug)]
 #[derive(Subcommand)]
 enum Commands {
     Orgs(commands::orgs::Orgs),
@@ -29,10 +40,15 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let mut base = CommandBase::new();
+    if let Some(config_path) = cli.config.as_deref() {
+        println!("Config path: {}", config_path.to_string());
+    }
 
-    match &cli.command {
-        Some(Commands::Orgs(orgs)) => orgs.execute(),
+    let mut config = UserConfig::new(&cli);
+    let mut base = CommandBase::new(&mut config);
+
+    match cli.command {
+        Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
         None => Ok(()),
