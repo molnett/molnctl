@@ -11,8 +11,9 @@ use crate::{
     },
 };
 
+pub mod apps;
 pub mod auth;
-pub mod initialize;
+pub mod environments;
 pub mod orgs;
 
 pub struct CommandBase<'a> {

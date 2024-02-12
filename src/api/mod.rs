@@ -36,6 +36,41 @@ impl APIClient {
         response.json()
     }
 
+    pub fn get_application(
+        &self,
+        token: &str,
+        name: &str
+    ) -> Result<ListOrganizationResponse, reqwest::Error> {
+        let url = format!("{}/organization", self.base_url);
+
+        let response = self.client
+            .get(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .send()?
+            .error_for_status()?;
+
+        response.json()
+    }
+
+    pub fn get_applications(
+        &self,
+        token: &str,
+    ) -> Result<ListOrganizationResponse, reqwest::Error> {
+        let url = format!("{}/organization", self.base_url);
+
+        let response = self.client
+            .get(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .send()?
+            .error_for_status()?;
+
+        response.json()
+    }
+
     pub fn create_organization(
         &self,
         token: &str,

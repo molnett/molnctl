@@ -1,18 +1,81 @@
-use std::path::Path;
-
 use anyhow::{anyhow, Result};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
+use std::path::Path;
+use super::CommandBase;
 
 use crate::config::{
     application::{Build, HttpService},
     scan::{scan_directory_for_type, ApplicationType},
 };
 
-use super::CommandBase;
+#[derive(Parser)]
+#[derive(Debug)]
+#[command(
+    author,
+    version,
+    about,
+    long_about,
+    subcommand_required = true,
+    arg_required_else_help = true
+)]
+pub struct Apps {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+impl Apps {
+    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+        match &self.command {
+            Some(Commands::Deploy(depl)) => depl.execute(base),
+            Some(Commands::Initialize(init)) => init.execute(base),
+            None => Ok(())
+        }
+    }
+}
+
+#[derive(Subcommand)]
+#[derive(Debug)]
+pub enum Commands {
+    /// Deploy a service
+    #[command(arg_required_else_help = true)]
+    Deploy(Deploy),
+    /// Generate Dockerfile and Molnett manifest
+    Initialize(Initialize),
+}
+
+#[derive(Parser)]
+#[derive(Debug)]
+pub struct Deploy {
+    #[arg(help = "Name of the app to deploy")]
+    name: String,
+    #[arg(long, help = "The image to deploy, e.g. yourimage:v1")]
+    image: Option<String>,
+    #[arg(long, help = "Skip confirmation")]
+    no_confirm: Option<bool>,
+}
+
+impl Deploy {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        // flags: image, no-confirm
+        // 1. check if authenticated
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        // 2. get existing application from API
+        let response = base.api_client()?.get_application(
+            token,
+            &self.name,
+        )?;
+        // 3. show user what changed
+        // 4. submit change
+        Ok(())
+    }
+
+}
 
 #[derive(Parser, Debug)]
-#[command(author, version)]
 #[clap(aliases = ["init"])]
 pub struct Initialize {
     #[clap(short, long)]
@@ -41,7 +104,6 @@ impl Initialize {
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let init_plan = InitPlan::builder(base)
-            .app_name(self.app_name.as_deref())
             .organization_id(self.organization_id.as_deref())
             .app_name(self.app_name.as_deref())
             .cpus(self.cpus)

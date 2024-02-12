@@ -2,7 +2,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use crate::config::user::UserConfig;
-use commands::CommandBase;
+use commands::{CommandBase, environments};
 mod api;
 mod commands;
 mod config;
@@ -19,7 +19,7 @@ mod config;
     arg_required_else_help = true
 )]
 struct Cli {
-    #[arg(short, long, value_name = "FILE", env("MOLNETT_CONFIG"))]
+    #[arg(short, long, value_name = "FILE", env("MOLNETT_CONFIG"), help = "config file, default is $HOME/.config/molnett/config.json")]
     config: Option<Utf8PathBuf>,
 
     #[arg(long, env("MOLNETT_API_URL"), help = "Url of the Molnett API, default is https://api.molnett.org")]
@@ -32,9 +32,14 @@ struct Cli {
 #[derive(Debug)]
 #[derive(Subcommand)]
 enum Commands {
+    /// Manage organizations
     Orgs(commands::orgs::Orgs),
+    /// Login to Molnett
     Auth(commands::auth::Auth),
-    Initialize(commands::initialize::Initialize),
+    /// Deploy and manage apps
+    Apps(commands::apps::Apps),
+    /// Create and manage environments
+    Environments(commands::environments::Environments),
 }
 
 fn main() -> Result<()> {
@@ -48,9 +53,10 @@ fn main() -> Result<()> {
     let mut base = CommandBase::new(&mut config);
 
     match cli.command {
-        Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
+        Some(Commands::Apps(apps)) => apps.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
-        Some(Commands::Initialize(init)) => init.execute(&mut base),
+        Some(Commands::Environments(environments)) => environments.execute(&mut base),
+        Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         None => Ok(()),
     }
 }

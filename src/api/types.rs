@@ -15,7 +15,6 @@ pub struct ListOrganizationResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Application {
-    id: String,
     name: String,
     organization_id: String,
 }
