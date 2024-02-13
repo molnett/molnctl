@@ -64,7 +64,7 @@ impl Deploy {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
         // 2. get existing application from API
-        let response = base.api_client()?.get_application(
+        let response = base.api_client().get_application(
             token,
             &self.name,
         )?;
@@ -201,7 +201,6 @@ impl InitPlanBuilder<'_> {
         let orgs = self
             .base
             .api_client()
-            .unwrap()
             .get_organizations(self.base.user_config().get_token().unwrap())
             .unwrap();
 

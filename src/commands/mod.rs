@@ -29,9 +29,9 @@ impl CommandBase<'_> {
         }
     }
 
-    pub fn api_client(&self) -> Result<APIClient> {
+    pub fn api_client(&self) -> APIClient {
         let url = self.user_config.get_url();
-        Ok(APIClient::new(url))
+        APIClient::new(url)
     }
 
     pub fn user_config(&self) -> &UserConfig {
