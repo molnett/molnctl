@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse, ListEnvironmentsResponse};
+use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse};
 
 pub mod types;
 
@@ -100,8 +100,8 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str
-    ) -> Result<ListEnvironmentsResponse, reqwest::Error> {
-        let url = format!("{}/orgs", self.base_url);
+    ) -> Result<Vec<String>, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
 
         let response = self.client
             .get(url)
