@@ -11,8 +11,9 @@ use crate::{
     },
 };
 
+pub mod apps;
 pub mod auth;
-pub mod initialize;
+pub mod environments;
 pub mod orgs;
 
 pub struct CommandBase<'a> {
@@ -28,9 +29,9 @@ impl CommandBase<'_> {
         }
     }
 
-    pub fn api_client(&self) -> Result<APIClient> {
+    pub fn api_client(&self) -> APIClient {
         let url = self.user_config.get_url();
-        Ok(APIClient::new(url))
+        APIClient::new(url)
     }
 
     pub fn user_config(&self) -> &UserConfig {

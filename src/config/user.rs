@@ -15,6 +15,7 @@ pub struct UserConfig {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct UserConfigInner {
     token: Option<Token>,
+    default_org: Option<String>,
     #[serde(default = "default_url")]
     url: String,
 }
@@ -70,6 +71,14 @@ impl UserConfig {
         self.config.token = Some(token);
 
         write_to_disk_json(&self.path, &self.disk_config)
+    }
+    pub fn write_default_org(&mut self, org_name: String) -> Result<(), super::Error> {
+        self.disk_config.default_org = Some(org_name.clone());
+        self.config.default_org = Some(org_name);
+        write_to_disk_json(&self.path, &self.disk_config)
+    }
+    pub fn get_default_org(&self) -> Option<&str> {
+        self.config.default_org.as_deref()
     }
     pub fn get_url(&self) -> &str {
         self.config.url.as_ref()
