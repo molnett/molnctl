@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use self::types::{ListOrganizationResponse, Organization};
+use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse, ListEnvironmentsResponse};
 
 pub mod types;
 
@@ -23,7 +23,7 @@ impl APIClient {
         &self,
         token: &str,
     ) -> Result<ListOrganizationResponse, reqwest::Error> {
-        let url = format!("{}/organization", self.base_url);
+        let url = format!("{}/orgs", self.base_url);
 
         let response = self.client
             .get(url)
@@ -77,11 +77,53 @@ impl APIClient {
         name: &str,
         billing_email: &str,
     ) -> Result<Organization, reqwest::Error> {
-        let url = format!("{}/organization", self.base_url);
+        let url = format!("{}/orgs", self.base_url);
 
         let mut body = HashMap::new();
         body.insert("name", name);
         body.insert("billing_email", billing_email);
+
+        let response = self
+            .client
+            .post(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()?
+            .error_for_status()?;
+
+        response.json()
+    }
+
+    pub fn get_environments(
+        &self,
+        token: &str,
+        org_name: &str
+    ) -> Result<ListEnvironmentsResponse, reqwest::Error> {
+        let url = format!("{}/orgs", self.base_url);
+
+        let response = self.client
+            .get(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .send()?
+            .error_for_status()?;
+
+        response.json()
+    }
+
+    pub fn create_environment(
+        &self,
+        token: &str,
+        name: &str,
+        org_name: &str
+    ) -> Result<CreateEnvironmentResponse, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
+
+        let mut body = HashMap::new();
+        body.insert("name", name);
 
         let response = self
             .client

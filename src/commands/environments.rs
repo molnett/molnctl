@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use super::CommandBase;
+use tabled::Table;
 
 #[derive(Parser)]
 #[derive(Debug)]
@@ -39,10 +40,31 @@ pub enum Commands {
 pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
+    #[arg(long, help = "Organization to create the environment in")]
+    org: Option<String>,
 }
 
 impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = if self.org.is_some() {
+            self.org.clone().unwrap()
+        } else {
+            base.user_config().get_default_org().unwrap().to_string()
+        };
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        let response = base.api_client().create_environment(
+            token,
+            &self.name,
+            &org_name
+        )?;
+
+        let table = Table::new([response]).to_string();
+        println!("{}", table);
+
         Ok(())
     }
 }

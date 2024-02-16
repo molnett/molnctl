@@ -77,6 +77,9 @@ impl UserConfig {
         self.config.default_org = Some(org_name);
         write_to_disk_json(&self.path, &self.disk_config)
     }
+    pub fn get_default_org(&self) -> Option<&str> {
+        self.config.default_org.as_deref()
+    }
     pub fn get_url(&self) -> &str {
         self.config.url.as_ref()
     }
