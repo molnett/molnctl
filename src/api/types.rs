@@ -13,11 +13,6 @@ pub struct ListOrganizationResponse {
     pub organizations: Vec<Organization>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ListEnvironmentsResponse {
-    pub environments: Vec<String>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct CreateEnvironmentResponse {
     pub name: String
