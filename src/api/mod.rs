@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use reqwest::blocking::Response;
 
-use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse};
+use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse, ListServicesResponse};
 
 pub mod types;
 
@@ -24,15 +25,7 @@ impl APIClient {
         token: &str,
     ) -> Result<ListOrganizationResponse, reqwest::Error> {
         let url = format!("{}/orgs", self.base_url);
-
-        let response = self.client
-            .get(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .send()?
-            .error_for_status()?;
-
+        let response = self.get(&url, token)?;
         response.json()
     }
 
@@ -42,32 +35,18 @@ impl APIClient {
         name: &str
     ) -> Result<ListOrganizationResponse, reqwest::Error> {
         let url = format!("{}/organization", self.base_url);
-
-        let response = self.client
-            .get(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .send()?
-            .error_for_status()?;
-
+        let response = self.get(&url, token)?;
         response.json()
     }
 
-    pub fn get_applications(
+    pub fn get_services(
         &self,
         token: &str,
-    ) -> Result<ListOrganizationResponse, reqwest::Error> {
-        let url = format!("{}/organization", self.base_url);
-
-        let response = self.client
-            .get(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .send()?
-            .error_for_status()?;
-
+        org_name: &str,
+        env_name: &str
+    ) -> Result<ListServicesResponse, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
+        let response = self.get(&url, token)?;
         response.json()
     }
 
@@ -78,21 +57,10 @@ impl APIClient {
         billing_email: &str,
     ) -> Result<Organization, reqwest::Error> {
         let url = format!("{}/orgs", self.base_url);
-
         let mut body = HashMap::new();
         body.insert("name", name);
         body.insert("billing_email", billing_email);
-
-        let response = self
-            .client
-            .post(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()?
-            .error_for_status()?;
-
+        let response = self.post(&url, token, &body)?;
         response.json()
     }
 
@@ -102,15 +70,7 @@ impl APIClient {
         org_name: &str
     ) -> Result<Vec<String>, reqwest::Error> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-
-        let response = self.client
-            .get(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .send()?
-            .error_for_status()?;
-
+        let response = self.get(&url, token)?;
         response.json()
     }
 
@@ -121,20 +81,9 @@ impl APIClient {
         org_name: &str
     ) -> Result<CreateEnvironmentResponse, reqwest::Error> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-
         let mut body = HashMap::new();
         body.insert("name", name);
-
-        let response = self
-            .client
-            .post(url)
-            .header("User-Agent", self.user_agent.as_str())
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()?
-            .error_for_status()?;
-
+        let response = self.post(&url, token, &body)?;
         response.json()
     }
 
@@ -144,5 +93,26 @@ impl APIClient {
         let response = self.client.post(url).send()?.error_for_status()?;
 
         response.json()
+    }
+
+    fn get(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
+        return self.client
+            .get(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .send()?
+            .error_for_status();
+    }
+
+    fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
+        return self.client
+            .post(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()?
+            .error_for_status();
     }
 }
