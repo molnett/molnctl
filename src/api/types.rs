@@ -19,7 +19,13 @@ pub struct CreateEnvironmentResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Application {
+pub struct ListServicesResponse {
+    pub services: Vec<Service>
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
+pub struct Service {
     name: String,
-    organization_id: String,
+    image: String,
+    container_port: u16,
 }

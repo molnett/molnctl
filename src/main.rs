@@ -36,8 +36,8 @@ enum Commands {
     Orgs(commands::orgs::Orgs),
     /// Login to Molnett
     Auth(commands::auth::Auth),
-    /// Deploy and manage apps
-    Apps(commands::apps::Apps),
+    /// Deploy and manage services
+    Services(commands::apps::Services),
     /// Create and manage environments
     Environments(commands::environments::Environments),
 }
@@ -53,7 +53,7 @@ fn main() -> Result<()> {
     let mut base = CommandBase::new(&mut config);
 
     match cli.command {
-        Some(Commands::Apps(apps)) => apps.execute(&mut base),
+        Some(Commands::Services(svcs)) => svcs.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Environments(environments)) => environments.execute(&mut base),
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),

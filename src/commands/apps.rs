@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use std::path::Path;
 use super::CommandBase;
+use tabled::Table;
 
 use crate::config::{
     application::{Build, HttpService},
@@ -19,16 +20,17 @@ use crate::config::{
     subcommand_required = true,
     arg_required_else_help = true
 )]
-pub struct Apps {
+pub struct Services {
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
-impl Apps {
+impl Services {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         match &self.command {
             Some(Commands::Deploy(depl)) => depl.execute(base),
             Some(Commands::Initialize(init)) => init.execute(base),
+            Some(Commands::List(list)) => list.execute(base),
             None => Ok(())
         }
     }
@@ -42,6 +44,8 @@ pub enum Commands {
     Deploy(Deploy),
     /// Generate Dockerfile and Molnett manifest
     Initialize(Initialize),
+    /// List services
+    List(List)
 }
 
 #[derive(Parser)]
@@ -72,7 +76,6 @@ impl Deploy {
         // 4. submit change
         Ok(())
     }
-
 }
 
 #[derive(Parser, Debug)]
@@ -292,5 +295,39 @@ impl InitPlanBuilder<'_> {
 impl InitPlan {
     pub fn builder<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
         InitPlanBuilder::new(base)
+    }
+}
+
+#[derive(Parser)]
+#[derive(Debug)]
+pub struct List {
+    #[arg(long, help = "Organization to list the services of")]
+    org: Option<String>,
+    #[arg(long, help = "Environment to list the services of")]
+    env: String,
+}
+
+impl List {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = if self.org.is_some() {
+            self.org.clone().unwrap()
+        } else {
+            base.user_config().get_default_org().unwrap().to_string()
+        };
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        let response = base.api_client().get_services(
+            token,
+            &org_name,
+            &self.env
+        )?;
+
+        let table = Table::new(response.services).to_string();
+        println!("{}", table);
+
+        Ok(())
     }
 }
