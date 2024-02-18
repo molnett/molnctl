@@ -1,15 +1,13 @@
+use crate::config::user::UserConfig;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
-use crate::config::user::UserConfig;
-use commands::{CommandBase, environments};
+use commands::{environments, CommandBase};
 mod api;
 mod commands;
 mod config;
 
-
-#[derive(Debug)]
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(
     author,
     version,
@@ -18,19 +16,28 @@ mod config;
     subcommand_required = true,
     arg_required_else_help = true
 )]
-struct Cli {
-    #[arg(short, long, value_name = "FILE", env("MOLNETT_CONFIG"), help = "config file, default is $HOME/.config/molnett/config.json")]
+pub struct Cli {
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        env("MOLNETT_CONFIG"),
+        help = "config file, default is $HOME/.config/molnett/config.json"
+    )]
     config: Option<Utf8PathBuf>,
 
-    #[arg(long, env("MOLNETT_API_URL"), help = "Url of the Molnett API, default is https://api.molnett.org")]
+    #[arg(
+        long,
+        env("MOLNETT_API_URL"),
+        help = "Url of the Molnett API, default is https://api.molnett.org"
+    )]
     url: Option<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
-#[derive(Debug)]
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 enum Commands {
     /// Manage organizations
     Orgs(commands::orgs::Orgs),

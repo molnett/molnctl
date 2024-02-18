@@ -1,6 +1,11 @@
-use anyhow::Result;
+use std::{
+    io::Write,
+    process::{Command, Stdio},
+};
+
+use anyhow::{anyhow, Result};
 use chrono::Utc;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, ClientId, CsrfToken, TokenResponse, TokenUrl,
 };
@@ -10,12 +15,43 @@ use crate::config::user::Token;
 
 use super::CommandBase;
 
-#[derive(Parser)]
-#[derive(Debug)]
-#[command(author, version, about, long_about)]
-pub struct Auth {}
+#[derive(Parser, Debug)]
+#[command(
+    author,
+    version,
+    about,
+    long_about,
+    subcommand_required = true,
+    arg_required_else_help = true
+)]
+pub struct Auth {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
 
 impl Auth {
+    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+        match &self.command {
+            Some(Commands::Login(login)) => login.execute(base),
+            Some(Commands::Docker(docker)) => docker.execute(base),
+            None => Ok(()),
+        }
+    }
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Login to Molnett
+    Login(Login),
+
+    // Login to Docker Registry
+    Docker(Docker),
+}
+
+#[derive(Parser, Debug)]
+pub struct Login {}
+
+impl Login {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         let server = Server::http("localhost:0").unwrap();
         let local_port = server.server_addr().to_ip().unwrap().port();
@@ -28,9 +64,7 @@ impl Auth {
             AuthUrl::new(format!("{}/oauth2/auth", url)).unwrap(),
             Some(TokenUrl::new(format!("{}/oauth2/token", url)).unwrap()),
         )
-        .set_redirect_uri(
-            oauth2::RedirectUrl::new(redirect_uri.clone()).unwrap(),
-        );
+        .set_redirect_uri(oauth2::RedirectUrl::new(redirect_uri.clone()).unwrap());
 
         let (pkce_code_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
 
@@ -70,6 +104,40 @@ impl Auth {
             request.respond(Response::from_string("Success! You can close this tab now"))?;
 
             return Ok(());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Parser, Debug)]
+pub struct Docker {}
+
+impl Docker {
+    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+        let token = base
+            .user_config
+            .get_token()
+            .ok_or_else(|| anyhow!("PANIC"))?;
+
+        let mut command = Command::new("docker")
+            .arg("login")
+            .arg("register.molnett.org")
+            .arg("--username=x")
+            .arg("--password-stdin")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        if let Some(mut stdin) = command.stdin.take() {
+            stdin.write_all(token.as_bytes())?; // drop would happen here
+        }
+
+        let output = command.wait_with_output()?;
+
+        if !output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stderr));
+        } else {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
         }
         Ok(())
     }
