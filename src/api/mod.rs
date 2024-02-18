@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use reqwest::blocking::Response;
 
-use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse, ListServicesResponse};
+use self::types::*;
 
 pub mod types;
 
@@ -29,12 +29,14 @@ impl APIClient {
         response.json()
     }
 
-    pub fn get_application(
+    pub fn get_service(
         &self,
         token: &str,
+        org_name: &str,
+        env_name: &str,
         name: &str
-    ) -> Result<ListOrganizationResponse, reqwest::Error> {
-        let url = format!("{}/organization", self.base_url);
+    ) -> Result<Service, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, name);
         let response = self.get(&url, token)?;
         response.json()
     }
@@ -87,11 +89,20 @@ impl APIClient {
         response.json()
     }
 
-    pub fn initialize_application(&self) -> Result<(), reqwest::Error> {
-        let url = format!("{}/application", self.base_url);
-
-        let response = self.client.post(url).send()?.error_for_status()?;
-
+    pub fn deploy_service(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        service: Service
+    ) -> Result<Service, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
+        let mut body: HashMap<&str, &str> = HashMap::new();
+        let port_str = &format!("{}", service.container_port);
+        body.insert("container_port", port_str);
+        body.insert("name", &service.name);
+        body.insert("image", &service.image);
+        let response = self.post(&url, token, &body)?;
         response.json()
     }
 
