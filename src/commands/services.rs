@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result, Ok};
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use difference::{Difference, Changeset};
@@ -125,7 +125,11 @@ impl Deploy {
                 println!("no changes detected");
                 return Ok(())
             }
-            let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
+            let existing_svc_yaml = if existing_svc.is_some() {
+                serde_yaml::to_string(&existing_svc)?
+            } else {
+                "".to_string()
+            };
             let new_svc_yaml = serde_yaml::to_string(&new_svc)?;
             self.render_diff(existing_svc_yaml, new_svc_yaml)?;
             let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
