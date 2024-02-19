@@ -23,7 +23,7 @@ pub struct ListServicesResponse {
     pub services: Vec<Service>
 }
 
-#[derive(Serialize, Deserialize, Debug, Tabled, Clone)]
+#[derive(Serialize, Deserialize, Debug, Tabled, Clone, PartialEq)]
 pub struct Service {
     pub name: String,
     pub image: String,

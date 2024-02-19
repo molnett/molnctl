@@ -1,6 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, Ok};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
+use difference::{Difference, Changeset};
+use std::io::Write;
 use std::path::Path;
 use super::CommandBase;
 use tabled::Table;
@@ -57,7 +59,7 @@ pub struct Deploy {
     env: String,
     #[arg(short, long, help = "The image to deploy, e.g. yourimage:v1")]
     image: Option<String>,
-    #[arg(long, help = "(not implemented) Skip confirmation")]
+    #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
     #[arg(short, long, help = "Port the application listens on")]
     port: Option<u16>,
@@ -119,13 +121,50 @@ impl Deploy {
         };
 
         if let Some(false) = self.no_confirm {
-            // TODO: show user what changed
+            if existing_svc.is_some() && existing_svc.clone().unwrap() == new_svc {
+                println!("no changes detected");
+                return Ok(())
+            }
             let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
-            println!("{}", existing_svc_yaml);
+            let new_svc_yaml = serde_yaml::to_string(&new_svc)?;
+            self.render_diff(existing_svc_yaml, new_svc_yaml)?;
+            let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt("Do you want to apply the above diff?")
+                .items(&["no", "yes"])
+                .interact()
+                .unwrap();
+            if selection == 0 {
+                println!("Cancelling...");
+                return Ok(())
+            }
         }
 
         let result = base.api_client().deploy_service(token, &org_name, &self.env, new_svc)?;
         println!("Service {} deployed", result.name);
+        Ok(())
+    }
+
+    fn render_diff(&self, a: String, b: String) -> Result<()> {
+        let Changeset { diffs, .. } = Changeset::new(&a, &b, "\n");
+        let mut t = term::stdout().unwrap();
+        for i in 0..diffs.len() {
+            match diffs[i] {
+                Difference::Same(ref x) => {
+                    t.reset().unwrap();
+                    writeln!(t, " {}", x)?;
+                }
+                Difference::Add(ref x) => {
+                    t.fg(term::color::GREEN).unwrap();
+                    writeln!(t, "+{}", x)?;
+                }
+                Difference::Rem(ref x) => {
+                    t.fg(term::color::RED).unwrap();
+                    writeln!(t, "-{}", x)?;
+                }
+            }
+        }
+        t.reset().unwrap();
+        t.flush().unwrap();
         Ok(())
     }
 }
