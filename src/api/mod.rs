@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use reqwest::blocking::Response;
 
-use self::types::{ListOrganizationResponse, Organization, CreateEnvironmentResponse, ListServicesResponse};
+use self::types::*;
 
 pub mod types;
 
@@ -29,12 +29,14 @@ impl APIClient {
         response.json()
     }
 
-    pub fn get_application(
+    pub fn get_service(
         &self,
         token: &str,
+        org_name: &str,
+        env_name: &str,
         name: &str
-    ) -> Result<ListOrganizationResponse, reqwest::Error> {
-        let url = format!("{}/organization", self.base_url);
+    ) -> Result<Service, reqwest::Error> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, name);
         let response = self.get(&url, token)?;
         response.json()
     }
@@ -87,12 +89,17 @@ impl APIClient {
         response.json()
     }
 
-    pub fn initialize_application(&self) -> Result<(), reqwest::Error> {
-        let url = format!("{}/application", self.base_url);
-
-        let response = self.client.post(url).send()?.error_for_status()?;
-
-        response.json()
+    pub fn deploy_service(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        service: Service
+    ) -> anyhow::Result<Service> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
+        let body = serde_json::to_string(&service)?;
+        let response = self.post_str(&url, token, body)?;
+        Ok(serde_json::from_str(&response.text()?)?)
     }
 
     fn get(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
@@ -112,6 +119,17 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
+            .send()?
+            .error_for_status();
+    }
+
+    fn post_str(&self, url: &str, token: &str, body: String) -> Result<Response, reqwest::Error> {
+        return self.client
+            .post(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .body(body)
             .send()?
             .error_for_status();
     }

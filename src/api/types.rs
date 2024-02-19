@@ -5,7 +5,7 @@ use tabled::Tabled;
 pub struct Organization {
     pub id: String,
     pub name: String,
-    billing_email: String,
+    pub billing_email: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,9 +23,9 @@ pub struct ListServicesResponse {
     pub services: Vec<Service>
 }
 
-#[derive(Serialize, Deserialize, Debug, Tabled)]
+#[derive(Serialize, Deserialize, Debug, Tabled, Clone)]
 pub struct Service {
-    name: String,
-    image: String,
-    container_port: u16,
+    pub name: String,
+    pub image: String,
+    pub container_port: u16,
 }

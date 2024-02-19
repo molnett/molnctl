@@ -5,10 +5,10 @@ use std::path::Path;
 use super::CommandBase;
 use tabled::Table;
 
-use crate::config::{
+use crate::{config::{
     application::{Build, HttpService},
     scan::{scan_directory_for_type, ApplicationType},
-};
+}, api::types::Service};
 
 #[derive(Parser)]
 #[derive(Debug)]
@@ -53,27 +53,79 @@ pub enum Commands {
 pub struct Deploy {
     #[arg(help = "Name of the app to deploy")]
     name: String,
-    #[arg(long, help = "The image to deploy, e.g. yourimage:v1")]
+    #[arg(long, help = "Environment to deploy to")]
+    env: String,
+    #[arg(short, long, help = "The image to deploy, e.g. yourimage:v1")]
     image: Option<String>,
-    #[arg(long, help = "Skip confirmation")]
+    #[arg(long, help = "(not implemented) Skip confirmation")]
     no_confirm: Option<bool>,
+    #[arg(short, long, help = "Port the application listens on")]
+    port: Option<u16>,
+    #[arg(long, help = "Organization to deploy to")]
+    org: Option<String>,
 }
 
 impl Deploy {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
-        // flags: image, no-confirm
-        // 1. check if authenticated
+        let org_name = if self.org.is_some() {
+            self.org.clone().unwrap()
+        } else {
+            base.user_config().get_default_org().unwrap().to_string()
+        };
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
-        // 2. get existing application from API
-        let response = base.api_client().get_application(
+
+        let response = base.api_client().get_service(
             token,
-            &self.name,
-        )?;
-        // 3. show user what changed
-        // 4. submit change
+            &org_name,
+            &self.env,
+            &self.name
+        );
+
+        let existing_svc: Option<Service>;
+        if let Err(e) = response {
+            existing_svc = None;
+            if let Some(reqwest::StatusCode::NOT_FOUND) = e.status() {
+                // User needs to set every attribute if service does not exist yet
+                if self.image.is_none() || self.port.is_none() {
+                    return Err(anyhow!("Image and port are mandatory if service does not exist"))
+                }
+            } else if let Some(reqwest::StatusCode::UNAUTHORIZED) = e.status() {
+                return Err(anyhow!("Unauthorized, please login first"))
+            } else {
+                return Err(anyhow!("Could not check whether service exists or not"))
+            }
+        } else {
+            existing_svc = Some(response.unwrap());
+        }
+
+        let mut new_svc: Service;
+        if existing_svc.is_some() {
+            new_svc = existing_svc.clone().unwrap();
+            if let Some(image) = &self.image {
+                new_svc.image = image.to_string()
+            }
+            if let Some(port) = self.port {
+                new_svc.container_port = port
+            }
+        } else {
+            new_svc = Service {
+                name: self.name.clone(),
+                image: self.image.clone().unwrap(),
+                container_port: self.port.clone().unwrap()
+            }
+        };
+
+        if let Some(false) = self.no_confirm {
+            // TODO: show user what changed
+            let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
+            println!("{}", existing_svc_yaml);
+        }
+
+        let result = base.api_client().deploy_service(token, &org_name, &self.env, new_svc)?;
+        println!("Service {} deployed", result.name);
         Ok(())
     }
 }
@@ -133,7 +185,7 @@ impl Initialize {
             }
         }
 
-        println!("Creating app...");
+        println!("Creating service...");
         println!("{:#?}", app_config);
 
         Ok(())
