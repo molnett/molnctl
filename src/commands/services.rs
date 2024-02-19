@@ -125,8 +125,7 @@ impl Deploy {
         }
 
         let result = base.api_client().deploy_service(token, &org_name, &self.env, new_svc)?;
-        println!("{:?}", result);
-
+        println!("Service {} deployed", result.name);
         Ok(())
     }
 }
@@ -186,7 +185,7 @@ impl Initialize {
             }
         }
 
-        println!("Creating app...");
+        println!("Creating service...");
         println!("{:#?}", app_config);
 
         Ok(())

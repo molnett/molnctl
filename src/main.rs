@@ -37,7 +37,7 @@ enum Commands {
     /// Login to Molnett
     Auth(commands::auth::Auth),
     /// Deploy and manage services
-    Services(commands::apps::Services),
+    Services(commands::services::Services),
     /// Create and manage environments
     Environments(commands::environments::Environments),
 }

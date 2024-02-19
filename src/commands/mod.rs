@@ -11,10 +11,10 @@ use crate::{
     },
 };
 
-pub mod apps;
 pub mod auth;
 pub mod environments;
 pub mod orgs;
+pub mod services;
 
 pub struct CommandBase<'a> {
     user_config: &'a mut UserConfig,

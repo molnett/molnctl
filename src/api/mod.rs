@@ -95,15 +95,11 @@ impl APIClient {
         org_name: &str,
         env_name: &str,
         service: Service
-    ) -> Result<Service, reqwest::Error> {
+    ) -> anyhow::Result<Service> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
-        let mut body: HashMap<&str, &str> = HashMap::new();
-        let port_str = &format!("{}", service.container_port);
-        body.insert("container_port", port_str);
-        body.insert("name", &service.name);
-        body.insert("image", &service.image);
-        let response = self.post(&url, token, &body)?;
-        response.json()
+        let body = serde_json::to_string(&service)?;
+        let response = self.post_str(&url, token, body)?;
+        Ok(serde_json::from_str(&response.text()?)?)
     }
 
     fn get(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
@@ -123,6 +119,17 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
+            .send()?
+            .error_for_status();
+    }
+
+    fn post_str(&self, url: &str, token: &str, body: String) -> Result<Response, reqwest::Error> {
+        return self.client
+            .post(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .body(body)
             .send()?
             .error_for_status();
     }
