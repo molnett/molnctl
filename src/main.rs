@@ -2,7 +2,7 @@ use crate::config::user::UserConfig;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
-use commands::{environments, CommandBase};
+use commands::CommandBase;
 mod api;
 mod commands;
 mod config;
