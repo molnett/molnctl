@@ -55,7 +55,7 @@ pub enum Commands {
 pub struct Deploy {
     #[arg(help = "Name of the app to deploy")]
     name: String,
-    #[arg(long, help = "Environment to deploy to")]
+    #[arg(short, long, help = "Environment to deploy to")]
     env: String,
     #[arg(short, long, help = "The image to deploy, e.g. yourimage:v1")]
     image: Option<String>,
@@ -133,8 +133,9 @@ impl Deploy {
             let new_svc_yaml = serde_yaml::to_string(&new_svc)?;
             self.render_diff(existing_svc_yaml, new_svc_yaml)?;
             let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt("Do you want to apply the above diff?")
+                .with_prompt("Do you want to apply the above changes?")
                 .items(&["no", "yes"])
+                .default(0)
                 .interact()
                 .unwrap();
             if selection == 0 {
