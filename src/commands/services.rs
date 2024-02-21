@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use difference::{Difference, Changeset};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -14,8 +15,7 @@ use crate::{config::{
     scan::{scan_directory_for_type, ApplicationType},
 }, api::types::Service};
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Debug, Parser)]
 #[command(
     author,
     version,
@@ -40,8 +40,7 @@ impl Services {
     }
 }
 
-#[derive(Subcommand)]
-#[derive(Debug)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Deploy a service
     #[command(arg_required_else_help = true)]
@@ -52,23 +51,20 @@ pub enum Commands {
     List(List)
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Debug, Parser)]
 pub struct Deploy {
-    #[arg(help = "Name of the app to deploy")]
-    name: String,
-    #[arg(short, long, help = "Environment to deploy to")]
-    env: String,
-    #[arg(short, long, help = "The image to deploy, e.g. yourimage:v1")]
-    image: Option<String>,
+    #[arg(help = "Path to molnett manifest")]
+    manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
-    #[arg(short, long, help = "Port the application listens on")]
-    port: Option<u16>,
     #[arg(long, help = "Organization to deploy to")]
     org: Option<String>,
-    #[arg(short, long, help = "Path to molnett manifest")]
-    manifest: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Manifest {
+    environment: String,
+    service: Service
 }
 
 impl Deploy {
@@ -83,11 +79,13 @@ impl Deploy {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
+        let manifest = self.read_manifest()?;
+
         let response = base.api_client().get_service(
             token,
             &org_name,
-            &self.env,
-            &self.name
+            &manifest.environment,
+            &manifest.service.name
         );
 
         let existing_svc = match response {
@@ -105,26 +103,13 @@ impl Deploy {
             }
         };
 
-        let new_svc = if self.manifest.is_some() {
-            self.construct_service_from_args()?
-        } else {
-            let mut new_svc = existing_svc.clone();
-            if let Some(image) = &self.image {
-                new_svc.image = image.to_string()
-            }
-            if let Some(port) = self.port {
-                new_svc.container_port = port
-            }
-            new_svc
-        };
-
         if let Some(false) = self.no_confirm {
-            if existing_svc == new_svc {
+            if existing_svc == manifest.service {
                 println!("no changes detected");
                 return Ok(())
             }
             let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
-            let new_svc_yaml = serde_yaml::to_string(&new_svc)?;
+            let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
             self.render_diff(existing_svc_yaml, new_svc_yaml)?;
             let selection = self.user_confirmation();
             if selection == 0 {
@@ -133,16 +118,15 @@ impl Deploy {
             }
         }
 
-        let result = base.api_client().deploy_service(token, &org_name, &self.env, new_svc)?;
+        let result = base.api_client().deploy_service(token, &org_name, &manifest.environment, manifest.service)?;
         println!("Service {} deployed", result.name);
         Ok(())
     }
 
     fn create_new_service(&self, base: &CommandBase, token: &str, org_name: &str) -> Result<()> {
-        let svc = self.construct_service_from_args()?;
-
+        let manifest = self.read_manifest()?;
         if let Some(false) = self.no_confirm {
-            let new_svc_yaml = serde_yaml::to_string(&svc)?;
+            let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
             self.render_diff("".to_string(), new_svc_yaml)?;
         }
 
@@ -152,35 +136,17 @@ impl Deploy {
             return Ok(())
         }
 
-        let result = base.api_client().deploy_service(token, org_name, &self.env, svc)?;
+        let result = base.api_client().deploy_service(token, org_name, &manifest.environment, manifest.service)?;
         println!("Service {} deployed", result.name);
         Ok(())
     }
 
-    fn construct_service_from_args(&self) -> Result<Service> {
-        if self.manifest.is_some() {
-            if self.image.is_some() || self.port.is_some() {
-                return Err(anyhow!("CLI arguments for service attributes can not be used together with manifest"))
-            }
-
-            let svc = self.read_manifest()?;
-            if self.name != svc.name {
-                return Err(anyhow!("Name given as CLI argument needs to match name in manifest"))
-            }
-
-            return Ok(svc)
-        } else {
-            // User needs to set every attribute if service does not exist yet
-            if self.image.is_none() || self.port.is_none() {
-                return Err(anyhow!("Image and port are mandatory if service does not exist"))
-            }
-
-            return Ok(Service {
-                name: self.name.clone(),
-                image: self.image.clone().unwrap(),
-                container_port: self.port.clone().unwrap()
-            })
-        }
+    fn read_manifest(&self) -> Result<Manifest> {
+        let file_path = self.manifest.clone();
+        let mut file_content = String::new();
+        File::open(file_path)?.read_to_string(&mut file_content)?;
+        let manifest = serde_yaml::from_str(&file_content)?;
+        Ok(manifest)
     }
 
     fn user_confirmation(&self) -> usize {
@@ -190,14 +156,6 @@ impl Deploy {
             .default(0)
             .interact()
             .unwrap()
-    }
-
-    fn read_manifest(&self) -> Result<Service> {
-        let file_path = self.manifest.clone().unwrap();
-        let mut file_content = String::new();
-        File::open(file_path)?.read_to_string(&mut file_content)?;
-        let svc = serde_yaml::from_str(&file_content)?;
-        Ok(svc)
     }
 
     fn render_diff(&self, a: String, b: String) -> Result<()> {
