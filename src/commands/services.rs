@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use difference::{Difference, Changeset};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -59,7 +59,7 @@ pub struct Deploy {
     no_confirm: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Manifest {
     environment: String,
     service: Service
