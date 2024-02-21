@@ -66,6 +66,14 @@ impl UserConfig {
     pub fn get_token(&self) -> Option<&str> {
         self.config.token.as_ref().map(|u| u.access_token.as_str())
     }
+    pub fn is_token_expired(&self) -> bool {
+        if let Some(token) = &self.config.token {
+            if let Some(expiry) = token.expiry {
+                return expiry < chrono::Utc::now();
+            }
+        }
+        true
+    }
     pub fn write_token(&mut self, token: Token) -> Result<(), super::Error> {
         self.disk_config.token = Some(token.clone());
         self.config.token = Some(token);

@@ -1,10 +1,9 @@
+use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use super::CommandBase;
 use tabled::Table;
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 #[command(
     author,
     version,
@@ -23,13 +22,12 @@ impl Environments {
         match &self.command {
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::List(list)) => list.execute(base),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
 
-#[derive(Subcommand)]
-#[derive(Debug)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Create an environment
     #[command(arg_required_else_help = true)]
@@ -39,8 +37,7 @@ pub enum Commands {
     List(List),
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
@@ -60,11 +57,9 @@ impl Create {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().create_environment(
-            token,
-            &self.name,
-            &org_name
-        )?;
+        let response = base
+            .api_client()
+            .create_environment(token, &self.name, &org_name)?;
 
         let table = Table::new([response]).to_string();
         println!("{}", table);
@@ -73,8 +68,7 @@ impl Create {
     }
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct List {
     #[arg(long, help = "Organization to list the environments of")]
     org: Option<String>,
@@ -92,10 +86,7 @@ impl List {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().get_environments(
-            token,
-            &org_name
-        )?;
+        let response = base.api_client().get_environments(token, &org_name)?;
 
         println!("{:?}", response);
 
