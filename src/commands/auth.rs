@@ -44,7 +44,7 @@ pub enum Commands {
     /// Login to Molnett
     Login(Login),
 
-    // Login to Docker Registry
+    /// Login to Docker Registry using Molnett token
     Docker(Docker),
 }
 
@@ -97,6 +97,8 @@ impl Login {
             if let Some(expires_in) = oauthtoken.expires_in() {
                 token.expiry =
                     Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
+            } else {
+                token.expiry = Some(Utc::now() + chrono::Duration::hours(1));
             }
 
             base.user_config_mut().write_token(token)?;
@@ -114,10 +116,14 @@ pub struct Docker {}
 
 impl Docker {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        let token = base
-            .user_config
-            .get_token()
-            .ok_or_else(|| anyhow!("PANIC"))?;
+        let token = base.user_config.get_token().ok_or_else(|| {
+            anyhow!("Could not get Molnett token. Please run molnctl auth login.")
+        })?;
+
+        if base.user_config.is_token_expired() {
+            println!("Token expired. Please run molnctl auth login.");
+            return Ok(());
+        }
 
         let mut command = Command::new("docker")
             .arg("login")
@@ -129,7 +135,7 @@ impl Docker {
             .spawn()?;
 
         if let Some(mut stdin) = command.stdin.take() {
-            stdin.write_all(token.as_bytes())?; // drop would happen here
+            stdin.write_all(token.as_bytes())?;
         }
 
         let output = command.wait_with_output()?;
