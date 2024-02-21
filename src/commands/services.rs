@@ -81,6 +81,11 @@ impl Deploy {
 
         let manifest = self.read_manifest()?;
 
+        let env_exists = base.api_client().get_environments(token, &org_name)?.contains(&manifest.environment);
+        if !env_exists {
+            return Err(anyhow!("Environment {} does not exist", manifest.environment))
+        }
+
         let response = base.api_client().get_service(
             token,
             &org_name,
