@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
 
 use crate::{
@@ -19,13 +19,15 @@ pub mod services;
 pub struct CommandBase<'a> {
     user_config: &'a mut UserConfig,
     app_config: OnceCell<ApplicationConfig>,
+    org_arg: Option<String>,
 }
 
 impl CommandBase<'_> {
-    pub fn new(user_config: &mut UserConfig) -> CommandBase {
+    pub fn new(user_config: &mut UserConfig, org_arg: Option<String>) -> CommandBase {
         CommandBase {
             user_config,
             app_config: OnceCell::new(),
+            org_arg,
         }
     }
 
@@ -53,5 +55,17 @@ impl CommandBase<'_> {
     pub fn app_config_mut(&mut self) -> Result<&mut ApplicationConfig, Error> {
         self.app_config()?;
         Ok(self.app_config.get_mut().ok_or(Error::UserConfigNotInit)?)
+    }
+
+    pub fn get_org(&self) -> Result<String> {
+        let org_name = if self.org_arg.is_some() {
+            self.org_arg.clone().unwrap()
+        } else {
+            match self.user_config.get_default_org() {
+                Some(cfg) => cfg.to_string(),
+                None => return Err(anyhow!("Either set a default org in the config or provide one via --org"))
+            }
+        };
+        Ok(org_name)
     }
 }

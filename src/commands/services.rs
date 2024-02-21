@@ -69,11 +69,7 @@ pub struct Manifest {
 
 impl Deploy {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
-        let org_name = if self.org.is_some() {
-            self.org.clone().unwrap()
-        } else {
-            base.user_config().get_default_org().unwrap().to_string()
-        };
+        let org_name = base.get_org()?;
         let token = base
             .user_config()
             .get_token()
@@ -419,11 +415,7 @@ pub struct List {
 
 impl List {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
-        let org_name = if self.org.is_some() {
-            self.org.clone().unwrap()
-        } else {
-            base.user_config().get_default_org().unwrap().to_string()
-        };
+        let org_name = base.get_org()?;
         let token = base
             .user_config()
             .get_token()

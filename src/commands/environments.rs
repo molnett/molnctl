@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use tabled::Table;
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[command(
     author,
     version,
@@ -27,7 +27,7 @@ impl Environments {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Create an environment
     #[command(arg_required_else_help = true)]
@@ -37,7 +37,7 @@ pub enum Commands {
     List(List),
 }
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
@@ -47,11 +47,7 @@ pub struct Create {
 
 impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
-        let org_name = if self.org.is_some() {
-            self.org.clone().unwrap()
-        } else {
-            base.user_config().get_default_org().unwrap().to_string()
-        };
+        let org_name = base.get_org()?;
         let token = base
             .user_config()
             .get_token()
@@ -68,19 +64,12 @@ impl Create {
     }
 }
 
-#[derive(Parser, Debug)]
-pub struct List {
-    #[arg(long, help = "Organization to list the environments of")]
-    org: Option<String>,
-}
+#[derive(Debug, Parser)]
+pub struct List {}
 
 impl List {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
-        let org_name = if self.org.is_some() {
-            self.org.clone().unwrap()
-        } else {
-            base.user_config().get_default_org().unwrap().to_string()
-        };
+        let org_name = base.get_org()?;
         let token = base
             .user_config()
             .get_token()

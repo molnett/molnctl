@@ -7,6 +7,7 @@ mod api;
 mod commands;
 mod config;
 
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -18,6 +19,7 @@ mod config;
 )]
 pub struct Cli {
     #[arg(
+        global = true,
         short,
         long,
         value_name = "FILE",
@@ -27,11 +29,20 @@ pub struct Cli {
     config: Option<Utf8PathBuf>,
 
     #[arg(
+        global = true,
         long,
         env("MOLNETT_API_URL"),
         help = "Url of the Molnett API, default is https://api.molnett.org"
     )]
     url: Option<String>,
+
+    #[arg(
+        global = true,
+        long,
+        env("MOLNETT_ORG"),
+        help = "Organization to use (overrides default in config)"
+    )]
+    org: Option<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -57,7 +68,7 @@ fn main() -> Result<()> {
     }
 
     let mut config = UserConfig::new(&cli);
-    let mut base = CommandBase::new(&mut config);
+    let mut base = CommandBase::new(&mut config, cli.org);
 
     match cli.command {
         Some(Commands::Services(svcs)) => svcs.execute(&mut base),
