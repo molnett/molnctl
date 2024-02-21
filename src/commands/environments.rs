@@ -41,8 +41,6 @@ pub enum Commands {
 pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
-    #[arg(long, help = "Organization to create the environment in")]
-    org: Option<String>,
 }
 
 impl Create {

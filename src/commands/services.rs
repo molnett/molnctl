@@ -57,8 +57,6 @@ pub struct Deploy {
     manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
-    #[arg(long, help = "Organization to deploy to")]
-    org: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -407,8 +405,6 @@ impl InitPlan {
 #[derive(Parser)]
 #[derive(Debug)]
 pub struct List {
-    #[arg(long, help = "Organization to list the services of")]
-    org: Option<String>,
     #[arg(long, help = "Environment to list the services of")]
     env: String,
 }
