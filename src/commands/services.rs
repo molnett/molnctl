@@ -159,7 +159,10 @@ impl Deploy {
 
     fn render_diff(&self, a: String, b: String) -> Result<()> {
         let Changeset { diffs, .. } = Changeset::new(&a, &b, "\n");
-        let mut t = term::stdout().unwrap();
+        let mut t = match term::stdout() {
+            Some(stdout) => stdout,
+            None => return Err(anyhow!("Could not render diff. Consider using --no-confirm"))
+        };
         for i in 0..diffs.len() {
             match diffs[i] {
                 Difference::Same(ref x) => {
