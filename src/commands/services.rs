@@ -127,12 +127,12 @@ impl Deploy {
         if let Some(false) = self.no_confirm {
             let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
             self.render_diff("".to_string(), new_svc_yaml)?;
-        }
 
-        let selection = self.user_confirmation();
-        if selection == 0 {
-            println!("Cancelling...");
-            return Ok(())
+            let selection = self.user_confirmation();
+            if selection == 0 {
+                println!("Cancelling...");
+                return Ok(())
+            }
         }
 
         let result = base.api_client().deploy_service(token, org_name, &manifest.environment, manifest.service)?;
