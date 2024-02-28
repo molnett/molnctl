@@ -1,5 +1,6 @@
+use anyhow::anyhow;
 use std::collections::HashMap;
-use reqwest::blocking::Response;
+use reqwest::{blocking::Response, StatusCode};
 
 use self::types::*;
 
@@ -102,6 +103,22 @@ impl APIClient {
         Ok(serde_json::from_str(&response.text()?)?)
     }
 
+    pub fn delete_service(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        svc_name: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, svc_name);
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Service does not exist")),
+            _ => Err(anyhow!("Failed to delete service. API returned {} {}", response.status(), response.text()?))
+        }
+    }
+
     fn get(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
         return self.client
             .get(url)
@@ -132,5 +149,14 @@ impl APIClient {
             .body(body)
             .send()?
             .error_for_status();
+    }
+
+    fn delete(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
+        return self.client
+            .delete(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .send();
     }
 }

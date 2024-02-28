@@ -35,6 +35,7 @@ impl Services {
             Some(Commands::Deploy(depl)) => depl.execute(base),
             Some(Commands::Initialize(init)) => init.execute(base),
             Some(Commands::List(list)) => list.execute(base),
+            Some(Commands::Delete(delete)) => delete.execute(base),
             None => Ok(())
         }
     }
@@ -48,7 +49,9 @@ pub enum Commands {
     /// Generate Dockerfile and Molnett manifest
     Initialize(Initialize),
     /// List services
-    List(List)
+    List(List),
+    /// Delete a service
+    Delete(Delete)
 }
 
 #[derive(Debug, Parser)]
@@ -429,6 +432,46 @@ impl List {
         let table = Table::new(response.services).to_string();
         println!("{}", table);
 
+        Ok(())
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct Delete {
+    #[arg(help = "Name of the service")]
+    name: String,
+    #[arg(long, help = "Environment the service is in")]
+    env: String,
+    #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
+    no_confirm: Option<bool>,
+}
+
+impl Delete {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = base.get_org()?;
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        if let Some(false) = self.no_confirm {
+            let prompt = format!("Org: {}, Environment: {}, Service: {}. Are you sure you want to delete this service?", org_name, self.env, self.name);
+            FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt(prompt)
+                .items(&["no", "yes"])
+                .default(0)
+                .interact()
+                .unwrap();
+        }
+
+        base.api_client().delete_service(
+            token,
+            &org_name,
+            &self.env,
+            &self.name
+        )?;
+
+        println!("Service {} deleted", self.name);
         Ok(())
     }
 }
