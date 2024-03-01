@@ -64,7 +64,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(config_path) = cli.config.as_deref() {
-        println!("Config path: {}", config_path.to_string());
+        println!("Config path: {}", config_path);
     }
 
     let mut config = UserConfig::new(&cli);

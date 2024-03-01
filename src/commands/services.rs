@@ -90,19 +90,9 @@ impl Deploy {
             &manifest.service.name
         );
 
-        let existing_svc = match response {
-            Ok(svc) => svc,
-            Err(e) => match e.status() {
-                Some(reqwest::StatusCode::NOT_FOUND) => {
-                    return self.create_new_service(base, token, &org_name)
-                },
-                Some(reqwest::StatusCode::UNAUTHORIZED) => {
-                    return Err(anyhow!("Unauthorized, please login first"))
-                },
-                _ => {
-                    return Err(anyhow!("Could not check whether service exists or not"))
-                }
-            }
+        let existing_svc = match response? {
+            Some(svc) => svc,
+            None => return self.create_new_service(base, token, &org_name),
         };
 
         if let Some(false) = self.no_confirm {

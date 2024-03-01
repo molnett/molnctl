@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use std::collections::HashMap;
 use reqwest::{blocking::Response, StatusCode};
 
@@ -26,7 +26,7 @@ impl APIClient {
         token: &str,
     ) -> Result<ListOrganizationResponse, reqwest::Error> {
         let url = format!("{}/orgs", self.base_url);
-        let response = self.get(&url, token)?;
+        let response = self.get(&url, token)?.error_for_status()?;
         response.json()
     }
 
@@ -36,10 +36,15 @@ impl APIClient {
         org_name: &str,
         env_name: &str,
         name: &str
-    ) -> Result<Service, reqwest::Error> {
+    ) -> anyhow::Result<Option<Service>> {
         let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, name);
         let response = self.get(&url, token)?;
-        response.json()
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Ok(None),
+            _ => Err(anyhow!("Failed to get service. API returned {} {}", response.status(), response.text()?))
+        }
     }
 
     pub fn get_services(
@@ -47,10 +52,10 @@ impl APIClient {
         token: &str,
         org_name: &str,
         env_name: &str
-    ) -> Result<ListServicesResponse, reqwest::Error> {
+    ) -> anyhow::Result<ListServicesResponse> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
-        let response = self.get(&url, token)?;
-        response.json()
+        let response: String = self.get(&url, token)?.error_for_status()?.text()?;
+        serde_json::from_str(response.as_str()).with_context(|| "Failed to deserialize response")
     }
 
     pub fn create_organization(
@@ -73,7 +78,7 @@ impl APIClient {
         org_name: &str
     ) -> Result<Vec<String>, reqwest::Error> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-        let response = self.get(&url, token)?;
+        let response = self.get(&url, token)?.error_for_status()?;
         response.json()
     }
 
@@ -125,8 +130,7 @@ impl APIClient {
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
-            .send()?
-            .error_for_status();
+            .send();
     }
 
     fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
