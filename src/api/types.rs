@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter, Result};
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tabled::Tabled;
 
@@ -28,4 +30,32 @@ pub struct Service {
     pub name: String,
     pub image: String,
     pub container_port: u16,
+    pub env: DisplayOption<DisplayHashMap>
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct DisplayHashMap(HashMap<String, String>);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct DisplayOption<T>(Option<T>);
+
+impl Display for DisplayOption<DisplayHashMap> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        if self.0.is_none() {
+            return Ok(())
+        }
+
+        let hashmap = self.0.as_ref().unwrap();
+        let mut entries = hashmap.0.iter().peekable();
+
+        while let Some((key, value)) = entries.next() {
+            write!(f, "{}: {}", key, value)?;
+
+            if entries.peek().is_some() {
+                write!(f, ", ")?;
+            }
+        }
+
+        Ok(())
+    }
 }
