@@ -198,8 +198,7 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
-            .send()?
-            .error_for_status();
+            .send()
     }
 
     fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
