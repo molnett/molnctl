@@ -33,6 +33,16 @@ pub struct Service {
     pub env: DisplayOption<DisplayHashMap>
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListSecretsResponse {
+    pub secrets: Vec<Secret>
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
+pub struct Secret {
+    pub name: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct DisplayHashMap(HashMap<String, String>);
 

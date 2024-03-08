@@ -50,14 +50,16 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Manage organizations
-    Orgs(commands::orgs::Orgs),
     /// Login to Molnett
     Auth(commands::auth::Auth),
-    /// Deploy and manage services
-    Services(commands::services::Services),
     /// Create and manage environments
     Environments(commands::environments::Environments),
+    /// Manage organizations
+    Orgs(commands::orgs::Orgs),
+    /// Create and manage secrets
+    Secrets(commands::secrets::Secrets),
+    /// Deploy and manage services
+    Services(commands::services::Services),
 }
 
 fn main() -> Result<()> {
@@ -71,10 +73,11 @@ fn main() -> Result<()> {
     let mut base = CommandBase::new(&mut config, cli.org);
 
     match cli.command {
-        Some(Commands::Services(svcs)) => svcs.execute(&mut base),
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Environments(environments)) => environments.execute(&mut base),
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
+        Some(Commands::Secrets(secrets)) => secrets.execute(&mut base),
+        Some(Commands::Services(svcs)) => svcs.execute(&mut base),
         None => Ok(()),
     }
 }

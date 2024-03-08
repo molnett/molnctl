@@ -14,6 +14,7 @@ use crate::{
 pub mod auth;
 pub mod environments;
 pub mod orgs;
+pub mod secrets;
 pub mod services;
 
 pub struct CommandBase<'a> {
