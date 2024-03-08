@@ -30,7 +30,10 @@ pub struct Service {
     pub name: String,
     pub image: String,
     pub container_port: u16,
-    pub env: DisplayOption<DisplayHashMap>
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub env: DisplayOption<DisplayHashMap>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub secrets: DisplayOption<DisplayHashMap>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,11 +46,15 @@ pub struct Secret {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayHashMap(HashMap<String, String>);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(Option<T>);
+
+fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    t == &T::default()
+}
 
 impl Display for DisplayOption<DisplayHashMap> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
