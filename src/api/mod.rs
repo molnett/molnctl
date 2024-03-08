@@ -140,6 +140,26 @@ impl APIClient {
         }
     }
 
+    pub fn create_secret(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        name: &str,
+        value: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}/secrets/{}", self.base_url, org_name, env_name, name);
+        let mut body = HashMap::new();
+        body.insert("value", value);
+        let response = self.put(&url, token, &body)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            _ => Err(anyhow!("Failed to create secret. API returned {} {}", response.status(), response.text()?))
+        }
+    }
+
     pub fn delete_secret(
         &self,
         token: &str,
@@ -163,6 +183,17 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .send();
+    }
+
+    fn put(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
+        return self.client
+            .put(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()?
+            .error_for_status();
     }
 
     fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {

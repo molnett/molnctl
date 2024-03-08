@@ -42,11 +42,34 @@ pub enum Commands {
 
 #[derive(Debug, Parser)]
 pub struct Create {
-
+    #[arg(help = "Name of the new secret")]
+    name: String,
+    #[arg(long, help = "Environment to create the secret in")]
+    env: String,
 }
 
 impl Create {
     pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = base.get_org()?;
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        let value: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt("Secret value:")
+            .interact_text()
+            .unwrap();
+
+        base.api_client().create_secret(
+            token,
+            &org_name,
+            &self.env,
+            &self.name,
+            &value
+        )?;
+
+        println!("Secret {} created", &self.name);
         Ok(())
     }
 }
