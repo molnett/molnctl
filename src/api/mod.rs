@@ -105,7 +105,13 @@ impl APIClient {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;
-        Ok(serde_json::from_str(&response.text()?)?)
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+        }
     }
 
     pub fn delete_service(
@@ -120,7 +126,59 @@ impl APIClient {
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::NOT_FOUND => Err(anyhow!("Service does not exist")),
-            _ => Err(anyhow!("Failed to delete service. API returned {} {}", response.status(), response.text()?))
+            _ => Err(anyhow!("Failed to delete service. API returned {} - {}", response.status(), response.text()?))
+        }
+    }
+
+    pub fn get_secrets(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str
+    ) -> anyhow::Result<ListSecretsResponse> {
+        let url = format!("{}/orgs/{}/envs/{}/secrets", self.base_url, org_name, env_name);
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize secrets list")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            _ => Err(anyhow!("Failed to get secrets. API returned {} - {}", response.status(), response.text()?))
+        }
+    }
+
+    pub fn create_secret(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        name: &str,
+        value: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}/secrets/{}", self.base_url, org_name, env_name, name);
+        let mut body = HashMap::new();
+        body.insert("value", value);
+        let response = self.put(&url, token, &body)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            _ => Err(anyhow!("Failed to create secret. API returned {} - {}", response.status(), response.text()?))
+        }
+    }
+
+    pub fn delete_secret(
+        &self,
+        token: &str,
+        org_name: &str,
+        env_name: &str,
+        secret_name: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}/secrets/{}", self.base_url, org_name, env_name, secret_name);
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Secret does not exist")),
+            _ => Err(anyhow!("Failed to delete secret. API returned {} - {}", response.status(), response.text()?))
         }
     }
 
@@ -131,6 +189,16 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .send();
+    }
+
+    fn put(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
+        return self.client
+            .put(url)
+            .header("User-Agent", self.user_agent.as_str())
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
     }
 
     fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
@@ -151,8 +219,7 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .body(body)
-            .send()?
-            .error_for_status();
+            .send();
     }
 
     fn delete(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
