@@ -65,7 +65,7 @@ impl Create {
             Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
                 .with_prompt("Secret value:")
                 .interact_text()
-                .unwrap()
+                .expect("Failed to get user input")
         };
 
         base.api_client().create_secret(
