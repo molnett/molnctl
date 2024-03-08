@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use super::CommandBase;
+use std::io::{self, BufRead};
 use tabled::Table;
 
 #[derive(Debug, Parser)]
@@ -46,6 +47,8 @@ pub struct Create {
     name: String,
     #[arg(long, help = "Environment to create the secret in")]
     env: String,
+    #[arg(long, help = "Whether or not to get the value from stdin", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
+    stdin: Option<bool>,
 }
 
 impl Create {
@@ -56,10 +59,14 @@ impl Create {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let value: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-            .with_prompt("Secret value:")
-            .interact_text()
-            .unwrap();
+        let value: String = if let Some(true) = self.stdin {
+            self.read_stdin()?
+        } else {
+            Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt("Secret value:")
+                .interact_text()
+                .unwrap()
+        };
 
         base.api_client().create_secret(
             token,
@@ -71,6 +78,27 @@ impl Create {
 
         println!("Secret {} created", &self.name);
         Ok(())
+    }
+
+    fn read_stdin(&self) -> Result<String> {
+        let mut lines = io::stdin().lock().lines();
+        let mut user_input = String::new();
+
+        while let Some(line) = lines.next() {
+            let last_input = line.unwrap();
+
+            if last_input.len() == 0 {
+                break;
+            }
+
+            if user_input.len() > 0 {
+                user_input.push_str("\n");
+            }
+
+            user_input.push_str(&last_input);
+        }
+
+        Ok(user_input)
     }
 }
 
