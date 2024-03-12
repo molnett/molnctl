@@ -47,7 +47,7 @@ impl HttpService {
     pub fn new(container_port: u16, force_https: Option<bool>) -> Self {
         HttpService {
             container_port: Some(container_port),
-            force_https: force_https,
+            force_https,
         }
     }
 }
@@ -84,19 +84,11 @@ impl ApplicationConfig {
         write_to_disk_yaml(&self.path, &self.disk_config)
     }
 
-    pub fn http_service(&self) -> Option<&HttpService> {
-        self.config.http_service.as_ref()
-    }
-
     pub fn set_http_service(&mut self, http_service: HttpService) -> Result<(), super::Error> {
         self.disk_config.http_service = Some(http_service.clone());
         self.config.http_service = Some(http_service);
 
         write_to_disk_yaml(&self.path, &self.disk_config)
-    }
-
-    pub fn build_config(&self) -> Option<&Build> {
-        self.config.build.as_ref()
     }
 
     pub fn set_build_config(&mut self, build_config: Build) -> Result<(), super::Error> {
