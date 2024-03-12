@@ -1,19 +1,22 @@
+use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
-use difference::{Difference, Changeset};
+use difference::{Changeset, Difference};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use super::CommandBase;
 use tabled::Table;
 
-use crate::{config::{
-    application::{Build, HttpService},
-    scan::{scan_directory_for_type, ApplicationType},
-}, api::types::Service};
+use crate::{
+    api::types::Service,
+    config::{
+        application::{Build, HttpService},
+        scan::{scan_directory_for_type, ApplicationType},
+    },
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -36,7 +39,7 @@ impl Services {
             Some(Commands::Initialize(init)) => init.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
@@ -51,7 +54,7 @@ pub enum Commands {
     /// List services
     List(List),
     /// Delete a service
-    Delete(Delete)
+    Delete(Delete),
 }
 
 #[derive(Debug, Parser)]
@@ -65,7 +68,7 @@ pub struct Deploy {
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
     environment: String,
-    service: Service
+    service: Service,
 }
 
 impl Deploy {
@@ -78,16 +81,22 @@ impl Deploy {
 
         let manifest = self.read_manifest()?;
 
-        let env_exists = base.api_client().get_environments(token, &org_name)?.contains(&manifest.environment);
+        let env_exists = base
+            .api_client()
+            .get_environments(token, &org_name)?
+            .contains(&manifest.environment);
         if !env_exists {
-            return Err(anyhow!("Environment {} does not exist", manifest.environment))
+            return Err(anyhow!(
+                "Environment {} does not exist",
+                manifest.environment
+            ));
         }
 
         let response = base.api_client().get_service(
             token,
             &org_name,
             &manifest.environment,
-            &manifest.service.name
+            &manifest.service.name,
         );
 
         let existing_svc = match response? {
@@ -98,7 +107,7 @@ impl Deploy {
         if let Some(false) = self.no_confirm {
             if existing_svc == manifest.service {
                 println!("no changes detected");
-                return Ok(())
+                return Ok(());
             }
             let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
             let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
@@ -106,11 +115,16 @@ impl Deploy {
             let selection = self.user_confirmation();
             if selection == 0 {
                 println!("Cancelling...");
-                return Ok(())
+                return Ok(());
             }
         }
 
-        let result = base.api_client().deploy_service(token, &org_name, &manifest.environment, manifest.service)?;
+        let result = base.api_client().deploy_service(
+            token,
+            &org_name,
+            &manifest.environment,
+            manifest.service,
+        )?;
         println!("Service {} deployed", result.name);
         Ok(())
     }
@@ -124,11 +138,16 @@ impl Deploy {
             let selection = self.user_confirmation();
             if selection == 0 {
                 println!("Cancelling...");
-                return Ok(())
+                return Ok(());
             }
         }
 
-        let result = base.api_client().deploy_service(token, org_name, &manifest.environment, manifest.service)?;
+        let result = base.api_client().deploy_service(
+            token,
+            org_name,
+            &manifest.environment,
+            manifest.service,
+        )?;
         println!("Service {} deployed", result.name);
         Ok(())
     }
@@ -154,7 +173,11 @@ impl Deploy {
         let Changeset { diffs, .. } = Changeset::new(&a, &b, "\n");
         let mut t = match term::stdout() {
             Some(stdout) => stdout,
-            None => return Err(anyhow!("Could not render diff. Consider using --no-confirm"))
+            None => {
+                return Err(anyhow!(
+                    "Could not render diff. Consider using --no-confirm"
+                ))
+            }
         };
         for i in 0..diffs.len() {
             match diffs[i] {
@@ -183,15 +206,6 @@ impl Deploy {
 pub struct Initialize {
     #[clap(short, long)]
     app_name: Option<String>,
-
-    #[clap(short, long)]
-    organization_id: Option<String>,
-
-    #[clap(short, long)]
-    cpus: Option<u8>,
-
-    #[clap(short, long)]
-    memory_mb: Option<usize>,
 }
 
 impl Initialize {
@@ -206,11 +220,8 @@ impl Initialize {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let init_plan = InitPlan::builder(base)
-            .organization_id(self.organization_id.as_deref())
+        let init_plan = InitPlan::builder()
             .app_name(self.app_name.as_deref())
-            .cpus(self.cpus)
-            .memory_mb(self.memory_mb)
             .determine_docker_image_path()
             .determine_application_type()
             .build()?;
@@ -243,37 +254,23 @@ impl Initialize {
 #[derive(Debug)]
 struct InitPlan {
     app_name: String,
-    organization_id: String,
-
-    cpus: u8,
-    memory_mb: usize,
 
     docker_file_path: String,
     application_type: ApplicationType,
 }
 
-struct InitPlanBuilder<'a> {
-    base: &'a CommandBase<'a>,
-
+struct InitPlanBuilder {
     app_name: String,
-    organization_id: String,
-
-    cpus: u8,
-    memory_mb: usize,
 
     docker_file_path: String,
 
     application_type: ApplicationType,
 }
 
-impl InitPlanBuilder<'_> {
-    pub fn new<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
+impl InitPlanBuilder {
+    pub fn new() -> InitPlanBuilder {
         InitPlanBuilder {
-            base,
             app_name: "".to_string(),
-            organization_id: "".to_string(),
-            cpus: 0,
-            memory_mb: 0,
             docker_file_path: "".to_string(),
             application_type: ApplicationType::Unknown,
         }
@@ -288,52 +285,11 @@ impl InitPlanBuilder<'_> {
                 .unwrap();
 
             self.app_name = input;
-            return self;
+            self
         } else {
             self.app_name = app_name.unwrap().to_string();
-            return self;
+            self
         }
-    }
-
-    pub fn organization_id(mut self, organization_id: Option<&str>) -> Self {
-        if organization_id.is_some() {
-            self.organization_id = organization_id.unwrap().to_string();
-            return self;
-        }
-
-        let orgs = self
-            .base
-            .api_client()
-            .get_organizations(self.base.user_config().get_token().unwrap())
-            .unwrap();
-
-        let org_ids = orgs
-            .organizations
-            .iter()
-            .map(|o| o.name.as_str())
-            .collect::<Vec<_>>();
-
-        let prompt = "Please select your organization: ";
-        let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
-            .with_prompt(prompt)
-            .items(&org_ids[..])
-            .interact()
-            .unwrap();
-
-        let input = orgs.organizations[selection].id.clone();
-
-        self.organization_id = input;
-        return self;
-    }
-
-    pub fn cpus(mut self, cpus: Option<u8>) -> Self {
-        self.cpus = cpus.or_else(|| Some(1)).unwrap();
-        self
-    }
-
-    pub fn memory_mb(mut self, memory_mb: Option<usize>) -> Self {
-        self.memory_mb = memory_mb.or_else(|| Some(2048)).unwrap();
-        self
     }
 
     pub fn determine_docker_image_path(mut self) -> Self {
@@ -362,20 +318,6 @@ impl InitPlanBuilder<'_> {
     }
 
     fn verify(&self) -> Result<()> {
-        let max_memory_limit = self.cpus as usize * 8192;
-        let min_memory_limit = self.cpus as usize * 2048;
-
-        if self.memory_mb > max_memory_limit {
-            return Err(anyhow!(
-                "Memory limit cannot be greater than 8192 MB per CPU",
-            ));
-        }
-        if self.memory_mb < min_memory_limit {
-            return Err(anyhow!(
-                "Memory allocation cannot be less than 2048 MB per CPU",
-            ));
-        }
-
         Ok(())
     }
 
@@ -383,9 +325,6 @@ impl InitPlanBuilder<'_> {
         self.verify()?;
         Ok(InitPlan {
             app_name: self.app_name,
-            organization_id: self.organization_id,
-            cpus: self.cpus,
-            memory_mb: self.memory_mb,
             docker_file_path: self.docker_file_path,
             application_type: self.application_type,
         })
@@ -393,13 +332,12 @@ impl InitPlanBuilder<'_> {
 }
 
 impl InitPlan {
-    pub fn builder<'a>(base: &'a CommandBase<'a>) -> InitPlanBuilder<'a> {
-        InitPlanBuilder::new(base)
+    pub fn builder() -> InitPlanBuilder {
+        InitPlanBuilder::new()
     }
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct List {
     #[arg(long, help = "Environment to list the services of")]
     env: String,
@@ -413,11 +351,9 @@ impl List {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().get_services(
-            token,
-            &org_name,
-            &self.env
-        )?;
+        let response = base
+            .api_client()
+            .get_services(token, &org_name, &self.env)?;
 
         let table = Table::new(response.services).to_string();
         println!("{}", table);
@@ -454,12 +390,8 @@ impl Delete {
                 .unwrap();
         }
 
-        base.api_client().delete_service(
-            token,
-            &org_name,
-            &self.env,
-            &self.name
-        )?;
+        base.api_client()
+            .delete_service(token, &org_name, &self.env, &self.name)?;
 
         println!("Service {} deleted", self.name);
         Ok(())
