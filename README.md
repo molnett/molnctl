@@ -1,6 +1,6 @@
 # Molnctl
 
-Molnctl is the commandline interface to interact with [Molnett](molnett.com).
+Molnctl is the commandline interface to interact with [Molnett](https://molnett.com).
 
 ## Installation
 
