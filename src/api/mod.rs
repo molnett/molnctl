@@ -106,7 +106,7 @@ impl APIClient {
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;
         match response.status() {
-            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
