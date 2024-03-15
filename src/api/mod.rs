@@ -63,13 +63,19 @@ impl APIClient {
         token: &str,
         name: &str,
         billing_email: &str,
-    ) -> Result<Organization, reqwest::Error> {
+    ) -> anyhow::Result<Organization> {
         let url = format!("{}/orgs", self.base_url);
         let mut body = HashMap::new();
         body.insert("name", name);
         body.insert("billing_email", billing_email);
         let response = self.post(&url, token, &body)?;
-        response.json()
+        match response.status() {
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize org")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+        }
     }
 
     pub fn get_environments(
@@ -87,12 +93,18 @@ impl APIClient {
         token: &str,
         name: &str,
         org_name: &str
-    ) -> Result<CreateEnvironmentResponse, reqwest::Error> {
+    ) -> anyhow::Result<CreateEnvironmentResponse> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
         let mut body = HashMap::new();
         body.insert("name", name);
         let response = self.post(&url, token, &body)?;
-        response.json()
+        match response.status() {
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize env")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+        }
     }
 
     pub fn deploy_service(
@@ -208,8 +220,7 @@ impl APIClient {
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
-            .send()?
-            .error_for_status();
+            .send()
     }
 
     fn post_str(&self, url: &str, token: &str, body: String) -> Result<Response, reqwest::Error> {
