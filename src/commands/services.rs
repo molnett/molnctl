@@ -92,24 +92,24 @@ impl Deploy {
             ));
         }
 
-        let response = base.api_client().get_service(
-            token,
-            &org_name,
-            &manifest.environment,
-            &manifest.service.name,
-        );
-
-        let existing_svc = match response? {
-            Some(svc) => svc,
-            None => return self.create_new_service(base, token, &org_name),
-        };
-
         if let Some(false) = self.no_confirm {
-            if existing_svc == manifest.service {
-                println!("no changes detected");
-                return Ok(());
-            }
-            let existing_svc_yaml = serde_yaml::to_string(&existing_svc)?;
+            let response = base.api_client().get_service(
+                token,
+                &org_name,
+                &manifest.environment,
+                &manifest.service.name,
+            );
+
+            let existing_svc_yaml = match response? {
+                Some(svc) => {
+                    if svc == manifest.service {
+                        println!("no changes detected");
+                        return Ok(());
+                    }
+                    serde_yaml::to_string(&svc)?
+                }
+                None => "".to_string(),
+            };
             let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
             self.render_diff(existing_svc_yaml, new_svc_yaml)?;
             let selection = self.user_confirmation();
@@ -122,29 +122,6 @@ impl Deploy {
         let result = base.api_client().deploy_service(
             token,
             &org_name,
-            &manifest.environment,
-            manifest.service,
-        )?;
-        println!("Service {} deployed", result.name);
-        Ok(())
-    }
-
-    fn create_new_service(&self, base: &CommandBase, token: &str, org_name: &str) -> Result<()> {
-        let manifest = self.read_manifest()?;
-        if let Some(false) = self.no_confirm {
-            let new_svc_yaml = serde_yaml::to_string(&manifest.service)?;
-            self.render_diff("".to_string(), new_svc_yaml)?;
-
-            let selection = self.user_confirmation();
-            if selection == 0 {
-                println!("Cancelling...");
-                return Ok(());
-            }
-        }
-
-        let result = base.api_client().deploy_service(
-            token,
-            org_name,
             &manifest.environment,
             manifest.service,
         )?;
