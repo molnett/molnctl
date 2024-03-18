@@ -107,6 +107,21 @@ impl APIClient {
         }
     }
 
+    pub fn delete_environment(
+        &self,
+        token: &str,
+        org_name: &str,
+        name: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}", self.base_url, org_name, name);
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Environment does not exist")),
+            _ => Err(anyhow!("Failed to delete environment. API returned {} - {}", response.status(), response.text()?))
+        }
+    }
+
     pub fn deploy_service(
         &self,
         token: &str,
