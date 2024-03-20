@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter, Result};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use tabled::Tabled;
 
@@ -47,7 +47,7 @@ pub struct Secret {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct DisplayHashMap(HashMap<String, String>);
+pub struct DisplayHashMap(IndexMap<String, String>);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(Option<T>);
