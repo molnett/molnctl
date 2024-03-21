@@ -72,6 +72,7 @@ impl APIClient {
         match response.status() {
             StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize org")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Organization already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
             _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
@@ -101,9 +102,25 @@ impl APIClient {
         match response.status() {
             StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize env")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Environment already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!("Failed to create environment. API returned {} - {}", response.status(), response.text()?))
+        }
+    }
+
+    pub fn delete_environment(
+        &self,
+        token: &str,
+        org_name: &str,
+        name: &str
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/orgs/{}/envs/{}", self.base_url, org_name, name);
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Environment does not exist")),
+            _ => Err(anyhow!("Failed to delete environment. API returned {} - {}", response.status(), response.text()?))
         }
     }
 

@@ -1,6 +1,7 @@
 use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
+use dialoguer::FuzzySelect;
 use tabled::Table;
 
 #[derive(Debug, Parser)]
@@ -22,6 +23,7 @@ impl Environments {
         match &self.command {
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::List(list)) => list.execute(base),
+            Some(Commands::Delete(delete)) => delete.execute(base),
             None => Ok(()),
         }
     }
@@ -35,6 +37,8 @@ pub enum Commands {
     /// List environments
     #[command()]
     List(List),
+    /// Delete an environment
+    Delete(Delete),
 }
 
 #[derive(Debug, Parser)]
@@ -77,6 +81,40 @@ impl List {
 
         println!("{:?}", response);
 
+        Ok(())
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct Delete {
+    #[arg(help = "Name of the environment")]
+    name: String,
+    #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
+    no_confirm: Option<bool>,
+}
+
+impl Delete {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = base.get_org()?;
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        if let Some(false) = self.no_confirm {
+            let prompt = format!("Org: {}, Environment: {}. Are you sure you want to delete this environment and everything in it?", org_name, self.name);
+            FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt(prompt)
+                .items(&["no", "yes"])
+                .default(0)
+                .interact()
+                .unwrap();
+        }
+
+        base.api_client()
+            .delete_environment(token, &org_name, &self.name)?;
+
+        println!("Environment {} deleted", self.name);
         Ok(())
     }
 }
