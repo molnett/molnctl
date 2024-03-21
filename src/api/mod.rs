@@ -72,6 +72,7 @@ impl APIClient {
         match response.status() {
             StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize org")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Organization already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
             _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
@@ -101,9 +102,10 @@ impl APIClient {
         match response.status() {
             StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize env")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Environment already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!("Failed to create environment. API returned {} - {}", response.status(), response.text()?))
         }
     }
 

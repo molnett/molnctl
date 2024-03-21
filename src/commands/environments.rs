@@ -37,7 +37,7 @@ pub enum Commands {
     /// List environments
     #[command()]
     List(List),
-    /// Delete a service
+    /// Delete an environment
     Delete(Delete),
 }
 
