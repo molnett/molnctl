@@ -52,7 +52,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Generate the artifacts
-        run: cargo build --release
+        run: cargo build --release --target $TARGET
 
       - name: Move files
         run: |
