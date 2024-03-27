@@ -17,9 +17,9 @@ jobs:
           - TARGET: x86_64-unknown-linux-gnu # tested in a debian container on a mac
             OS: ubuntu-latest
           - TARGET: x86_64-apple-darwin # tested on a mac
-            OS: macos-latest
+            OS: macos-14
           - TARGET: aarch64-apple-darwin
-            OS: macos-arm-latest
+            OS: macos-14-arm
     name: Create Release ${{ github.event_name == 'pull_request' && '(dry-run)' }}
     runs-on: ${{ matrix.OS }}
     env:
