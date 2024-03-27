@@ -21,7 +21,7 @@ jobs:
           - TARGET: aarch64-apple-darwin
             OS: macos-arm-latest
     name: Create Release ${{ github.event_name == 'pull_request' && '(dry-run)' }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.OS }}
     env:
       TARGET: ${{ matrix.TARGET }}
       OS: ${{ matrix.OS }}
