@@ -11,7 +11,8 @@ use tabled::Table;
     about,
     long_about,
     subcommand_required = true,
-    arg_required_else_help = true
+    arg_required_else_help = true,
+    visible_alias = "envs"
 )]
 pub struct Environments {
     #[command(subcommand)]

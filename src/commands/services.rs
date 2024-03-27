@@ -25,7 +25,8 @@ use crate::{
     about,
     long_about,
     subcommand_required = true,
-    arg_required_else_help = true
+    arg_required_else_help = true,
+    visible_alias = "svcs"
 )]
 pub struct Services {
     #[command(subcommand)]
@@ -47,7 +48,6 @@ impl Services {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Deploy a service
-    #[command(arg_required_else_help = true)]
     Deploy(Deploy),
     /// Generate Dockerfile and Molnett manifest
     Initialize(Initialize),
@@ -59,7 +59,7 @@ pub enum Commands {
 
 #[derive(Debug, Parser)]
 pub struct Deploy {
-    #[arg(help = "Path to molnett manifest")]
+    #[arg(help = "Path to molnett manifest", default_value("./molnett.yaml"))]
     manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
@@ -179,9 +179,17 @@ impl Deploy {
 }
 
 #[derive(Parser, Debug)]
-#[clap(aliases = ["init"])]
+#[command(
+    author,
+    version,
+    about,
+    long_about,
+    subcommand_required = true,
+    arg_required_else_help = true,
+    visible_alias = "init"
+)]
 pub struct Initialize {
-    #[clap(short, long)]
+    #[arg(short, long)]
     app_name: Option<String>,
 }
 
