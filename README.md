@@ -7,7 +7,7 @@ Molnctl is the commandline interface to interact with [Molnett](https://molnett.
 ### Download from Github
 
 We recommend downloading the latest version from the [releases page](https://github.com/molnett/molnctl/releases).
-There are pre-compiled versions available for MacOS, Linux and Windows.
+There are pre-compiled versions available for MacOS and Linux.
 
 ### Compile it yourself
 
