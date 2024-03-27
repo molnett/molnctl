@@ -20,8 +20,6 @@ jobs:
             OS: macos-latest
           - TARGET: aarch64-apple-darwin
             OS: macos-arm-latest
-          - TARGET: x86_64-pc-windows-msvc # tested on a windows machine
-            OS: windows-latest
     name: Create Release ${{ github.event_name == 'pull_request' && '(dry-run)' }}
     runs-on: ubuntu-22.04
     env:
@@ -50,6 +48,8 @@ jobs:
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: $TARGET
 
       - name: Generate the artifacts
         run: cargo build --release --target $TARGET
@@ -57,12 +57,7 @@ jobs:
       - name: Move files
         run: |
           mkdir -p ./artifacts
-          if [[ $OS =~ ^windows.*$ ]]; then
-              EXEC=molnctl.exe
-          else
-              EXEC=molnctl
-          fi
-          mv ./target/$TARGET/release/$EXEC ./artifacts
+          mv ./target/$TARGET/release/molnctl ./artifacts/molnctl-$TARGET
 
       - name: Create Release
         if: github.event_name == 'push'
