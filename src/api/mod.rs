@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
-use std::collections::HashMap;
 use reqwest::{blocking::Response, StatusCode};
+use std::collections::HashMap;
 
 use self::types::*;
 
@@ -35,15 +35,23 @@ impl APIClient {
         token: &str,
         org_name: &str,
         env_name: &str,
-        name: &str
+        name: &str,
     ) -> anyhow::Result<Option<Service>> {
-        let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, name);
+        let url = format!(
+            "{}/orgs/{}/envs/{}/svcs/{}",
+            self.base_url, org_name, env_name, name
+        );
         let response = self.get(&url, token)?;
         match response.status() {
-            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize service")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Ok(None),
-            _ => Err(anyhow!("Failed to get service. API returned {} {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to get service. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -51,7 +59,7 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-        env_name: &str
+        env_name: &str,
     ) -> anyhow::Result<ListServicesResponse> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let response: String = self.get(&url, token)?.error_for_status()?.text()?;
@@ -70,19 +78,24 @@ impl APIClient {
         body.insert("billing_email", billing_email);
         let response = self.post(&url, token, &body)?;
         match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize org")?),
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize org")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::CONFLICT => Err(anyhow!("Organization already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to deploy service. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
     pub fn get_environments(
         &self,
         token: &str,
-        org_name: &str
+        org_name: &str,
     ) -> Result<Vec<String>, reqwest::Error> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
         let response = self.get(&url, token)?.error_for_status()?;
@@ -93,19 +106,24 @@ impl APIClient {
         &self,
         token: &str,
         name: &str,
-        org_name: &str
+        org_name: &str,
     ) -> anyhow::Result<CreateEnvironmentResponse> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
         let mut body = HashMap::new();
         body.insert("name", name);
         let response = self.post(&url, token, &body)?;
         match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize env")?),
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize env")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::CONFLICT => Err(anyhow!("Environment already exists")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!("Failed to create environment. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to create environment. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -113,14 +131,18 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-        name: &str
+        name: &str,
     ) -> anyhow::Result<()> {
         let url = format!("{}/orgs/{}/envs/{}", self.base_url, org_name, name);
         let response = self.delete(&url, token)?;
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::NOT_FOUND => Err(anyhow!("Environment does not exist")),
-            _ => Err(anyhow!("Failed to delete environment. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to delete environment. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -129,17 +151,22 @@ impl APIClient {
         token: &str,
         org_name: &str,
         env_name: &str,
-        service: Service
+        service: Service,
     ) -> anyhow::Result<Service> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;
         match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize service")?),
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize service")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
             StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!("Failed to deploy service. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to deploy service. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -148,14 +175,21 @@ impl APIClient {
         token: &str,
         org_name: &str,
         env_name: &str,
-        svc_name: &str
+        svc_name: &str,
     ) -> anyhow::Result<()> {
-        let url = format!("{}/orgs/{}/envs/{}/svcs/{}", self.base_url, org_name, env_name, svc_name);
+        let url = format!(
+            "{}/orgs/{}/envs/{}/svcs/{}",
+            self.base_url, org_name, env_name, svc_name
+        );
         let response = self.delete(&url, token)?;
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::NOT_FOUND => Err(anyhow!("Service does not exist")),
-            _ => Err(anyhow!("Failed to delete service. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to delete service. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -163,15 +197,23 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-        env_name: &str
+        env_name: &str,
     ) -> anyhow::Result<ListSecretsResponse> {
-        let url = format!("{}/orgs/{}/envs/{}/secrets", self.base_url, org_name, env_name);
+        let url = format!(
+            "{}/orgs/{}/envs/{}/secrets",
+            self.base_url, org_name, env_name
+        );
         let response = self.get(&url, token)?;
         match response.status() {
-            StatusCode::OK => Ok(serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize secrets list")?),
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize secrets list")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
-            _ => Err(anyhow!("Failed to get secrets. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to get secrets. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -181,9 +223,12 @@ impl APIClient {
         org_name: &str,
         env_name: &str,
         name: &str,
-        value: &str
+        value: &str,
     ) -> anyhow::Result<()> {
-        let url = format!("{}/orgs/{}/envs/{}/secrets/{}", self.base_url, org_name, env_name, name);
+        let url = format!(
+            "{}/orgs/{}/envs/{}/secrets/{}",
+            self.base_url, org_name, env_name, name
+        );
         let mut body = HashMap::new();
         body.insert("value", value);
         let response = self.put(&url, token, &body)?;
@@ -191,7 +236,11 @@ impl APIClient {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
-            _ => Err(anyhow!("Failed to create secret. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to create secret. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
@@ -200,19 +249,27 @@ impl APIClient {
         token: &str,
         org_name: &str,
         env_name: &str,
-        secret_name: &str
+        secret_name: &str,
     ) -> anyhow::Result<()> {
-        let url = format!("{}/orgs/{}/envs/{}/secrets/{}", self.base_url, org_name, env_name, secret_name);
+        let url = format!(
+            "{}/orgs/{}/envs/{}/secrets/{}",
+            self.base_url, org_name, env_name, secret_name
+        );
         let response = self.delete(&url, token)?;
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::NOT_FOUND => Err(anyhow!("Secret does not exist")),
-            _ => Err(anyhow!("Failed to delete secret. API returned {} - {}", response.status(), response.text()?))
+            _ => Err(anyhow!(
+                "Failed to delete secret. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
         }
     }
 
     fn get(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
-        return self.client
+        return self
+            .client
             .get(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))
@@ -220,28 +277,41 @@ impl APIClient {
             .send();
     }
 
-    fn put(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
-        return self.client
+    fn put(
+        &self,
+        url: &str,
+        token: &str,
+        body: &HashMap<&str, &str>,
+    ) -> Result<Response, reqwest::Error> {
+        return self
+            .client
             .put(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
-            .send()
+            .send();
     }
 
-    fn post(&self, url: &str, token: &str, body: &HashMap<&str, &str>) -> Result<Response, reqwest::Error> {
-        return self.client
+    fn post(
+        &self,
+        url: &str,
+        token: &str,
+        body: &HashMap<&str, &str>,
+    ) -> Result<Response, reqwest::Error> {
+        return self
+            .client
             .post(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
             .json(&body)
-            .send()
+            .send();
     }
 
     fn post_str(&self, url: &str, token: &str, body: String) -> Result<Response, reqwest::Error> {
-        return self.client
+        return self
+            .client
             .post(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))
@@ -251,7 +321,8 @@ impl APIClient {
     }
 
     fn delete(&self, url: &str, token: &str) -> Result<Response, reqwest::Error> {
-        return self.client
+        return self
+            .client
             .delete(url)
             .header("User-Agent", self.user_agent.as_str())
             .header("Authorization", format!("Bearer {}", token))

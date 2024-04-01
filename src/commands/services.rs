@@ -9,6 +9,9 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use tabled::Table;
+use tungstenite::connect;
+use tungstenite::http::Uri;
+use tungstenite::ClientRequestBuilder;
 
 use crate::{
     api::types::Service,
@@ -380,5 +383,55 @@ impl Delete {
 
         println!("Service {} deleted", self.name);
         Ok(())
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct Logs {
+    #[arg(help = "Path to molnett manifest", default_value("./molnett.yaml"))]
+    manifest: String,
+}
+
+impl Logs {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let org_name = base.get_org()?;
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        let manifest = self.read_manifest()?;
+        let logurl: Uri = url::Url::parse(
+            format!(
+                "{}/orgs/{}/envs/{}/svcs/{}/logs",
+                base.user_config().get_url().replace("http", "ws"),
+                org_name,
+                manifest.environment,
+                manifest.service.name,
+            )
+            .as_str(),
+        )
+        .unwrap()
+        .as_str()
+        .parse()
+        .unwrap();
+
+        let builder = ClientRequestBuilder::new(logurl)
+            .with_header("Authorization", format!("Bearer {}", token.to_owned()));
+
+        let (mut socket, _) = connect(builder).expect("Could not connect");
+
+        loop {
+            let msg = socket.read().expect("Error reading message");
+            println!("{}", msg.to_string().trim_end());
+        }
+    }
+
+    fn read_manifest(&self) -> Result<Manifest> {
+        let file_path = self.manifest.clone();
+        let mut file_content = String::new();
+        File::open(file_path)?.read_to_string(&mut file_content)?;
+        let manifest = serde_yaml::from_str(&file_content)?;
+        Ok(manifest)
     }
 }

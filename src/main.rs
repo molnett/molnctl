@@ -7,7 +7,6 @@ mod api;
 mod commands;
 mod config;
 
-
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -56,6 +55,8 @@ enum Commands {
     Environments(commands::environments::Environments),
     /// Deploy a service
     Deploy(commands::services::Deploy),
+    /// Tail logs from a service
+    Logs(commands::services::Logs),
     /// Generate Dockerfile and Molnett manifest
     Initialize(commands::services::Initialize),
     /// Manage organizations
@@ -80,6 +81,7 @@ fn main() -> Result<()> {
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Environments(environments)) => environments.execute(&mut base),
         Some(Commands::Deploy(deploy)) => deploy.execute(&mut base),
+        Some(Commands::Logs(logs)) => logs.execute(&mut base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         Some(Commands::Secrets(secrets)) => secrets.execute(&mut base),
