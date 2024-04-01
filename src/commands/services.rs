@@ -10,6 +10,7 @@ use std::io::Write;
 use std::path::Path;
 use tabled::Table;
 use tungstenite::connect;
+use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
 use crate::{
@@ -400,16 +401,20 @@ impl Logs {
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let manifest = self.read_manifest()?;
-
-        let logurl: tungstenite::http::Uri = format!(
-            "{}/orgs/{}/envs/{}/svcs/{}/logs",
-            base.user_config().get_url().replace("http", "ws"),
-            org_name,
-            manifest.environment,
-            manifest.service.name,
+        let logurl: Uri = url::Url::parse(
+            format!(
+                "{}/orgs/{}/envs/{}/svcs/{}/logs",
+                base.user_config().get_url().replace("http", "ws"),
+                org_name,
+                manifest.environment,
+                manifest.service.name,
+            )
+            .as_str(),
         )
+        .unwrap()
+        .as_str()
         .parse()
-        .expect("Could not parse url");
+        .unwrap();
 
         let builder = ClientRequestBuilder::new(logurl)
             .with_header("Authorization", format!("Bearer {}", token.to_owned()));
