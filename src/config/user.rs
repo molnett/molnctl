@@ -1,5 +1,6 @@
 use camino::Utf8PathBuf;
 use config::Config;
+use tungstenite::http::Uri;
 
 use crate::Cli;
 
