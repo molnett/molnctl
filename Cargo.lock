@@ -903,7 +903,6 @@ dependencies = [
  "difference",
  "dirs-next",
  "home",
- "http 1.1.0",
  "indexmap 2.2.5",
  "oauth2",
  "once_cell",

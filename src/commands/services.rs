@@ -3,7 +3,6 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use difference::{Changeset, Difference};
-use http::Uri;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
@@ -402,7 +401,7 @@ impl Logs {
 
         let manifest = self.read_manifest()?;
 
-        let logurl: Uri = format!(
+        let logurl: tungstenite::http::Uri = format!(
             "{}/orgs/{}/envs/{}/svcs/{}/logs",
             base.user_config().get_url().replace("http", "ws"),
             org_name,
