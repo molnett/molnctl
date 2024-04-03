@@ -96,10 +96,20 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-    ) -> Result<Vec<String>, reqwest::Error> {
+    ) -> anyhow::Result<Vec<String>> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-        let response = self.get(&url, token)?.error_for_status()?;
-        response.json()
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize environments")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Organization does not exist")),
+            _ => Err(anyhow!(
+                "Failed to get environments. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
     }
 
     pub fn create_environment(

@@ -5,7 +5,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use dirs_next::config_dir;
 use thiserror::Error;
 
-pub mod application;
 pub mod scan;
 pub mod user;
 

@@ -1,14 +1,8 @@
 use anyhow::{anyhow, Result};
-use once_cell::sync::OnceCell;
 
 use crate::{
     api::APIClient,
-    config::{
-        application::{ApplicationConfig, ApplicationConfigLoader},
-        default_app_config_path,
-        user::UserConfig,
-        Error,
-    },
+    config::user::UserConfig,
 };
 
 pub mod auth;
@@ -19,7 +13,6 @@ pub mod services;
 
 pub struct CommandBase<'a> {
     user_config: &'a mut UserConfig,
-    app_config: OnceCell<ApplicationConfig>,
     org_arg: Option<String>,
 }
 
@@ -27,7 +20,6 @@ impl CommandBase<'_> {
     pub fn new(user_config: &mut UserConfig, org_arg: Option<String>) -> CommandBase {
         CommandBase {
             user_config,
-            app_config: OnceCell::new(),
             org_arg,
         }
     }
@@ -43,19 +35,6 @@ impl CommandBase<'_> {
 
     pub fn user_config_mut(&mut self) -> &mut UserConfig {
         self.user_config
-    }
-
-    fn app_config_init(&self) -> Result<ApplicationConfig, Error> {
-        ApplicationConfigLoader::new(default_app_config_path()?).load()
-    }
-
-    pub fn app_config(&self) -> Result<&ApplicationConfig, Error> {
-        self.app_config.get_or_try_init(|| self.app_config_init())
-    }
-
-    pub fn app_config_mut(&mut self) -> Result<&mut ApplicationConfig, Error> {
-        self.app_config()?;
-        Ok(self.app_config.get_mut().ok_or(Error::UserConfigNotInit)?)
     }
 
     pub fn get_org(&self) -> Result<String> {

@@ -3,7 +3,8 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use difference::{Changeset, Difference};
-use serde::Deserialize;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -13,13 +14,8 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::{
-    api::types::Service,
-    config::{
-        application::{Build, HttpService},
-        scan::{scan_directory_for_type, ApplicationType},
-    },
-};
+use crate::api::APIClient;
+use crate::api::types::{DisplayHashMap, DisplayOption, Service};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -68,7 +64,7 @@ pub struct Deploy {
     no_confirm: Option<bool>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct Manifest {
     environment: String,
     service: Service,
@@ -187,141 +183,100 @@ impl Deploy {
     version,
     about,
     long_about,
-    subcommand_required = true,
     arg_required_else_help = true,
     visible_alias = "init"
 )]
 pub struct Initialize {
-    #[arg(short, long)]
-    app_name: Option<String>,
+    #[arg(short, long, help = "Path to molnett manifest", default_value("./molnett.yaml"))]
+    manifest: String,
 }
 
 impl Initialize {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        let app_config = base.app_config()?;
-        if app_config.name().is_some() {
-            return Err(anyhow!("App already initialized"));
+        let file_path = Path::new(&self.manifest);
+        if file_path.exists() {
+            let prompt = format!("The file {} exists, do you want to overwrite it?", self.manifest);
+            let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt(prompt)
+                .items(&["no", "yes"])
+                .default(0)
+                .interact()
+                .unwrap();
+            if selection == 0 {
+                println!("Cancelling...");
+                return Ok(());
+            }
         }
 
-        let _token = base
+        let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let init_plan = InitPlan::builder()
-            .app_name(self.app_name.as_deref())
-            .determine_docker_image_path()
-            .determine_application_type()
-            .build()?;
+        let manifest = ManifestBuilder::new(token.to_string(), base.api_client(), base.get_org()?)
+            .get_env_name()?
+            .get_service_name()?
+            .build();
 
-        let app_config = base.app_config_mut()?;
+        let mut file = File::create(file_path)?;
+        let yaml = serde_yaml::to_string(&manifest)?;
+        file.write_all(yaml.as_bytes())?;
 
-        app_config.set_name(init_plan.app_name)?;
-        app_config.set_http_service(HttpService::new(8080, None))?;
-        app_config.set_build_config(Build::new(Some(init_plan.docker_file_path), None))?;
+        println!("Wrote manifest to {}...", &self.manifest);
+        Ok(())
+    }
+}
 
-        if let ApplicationType::Rust = init_plan.application_type {
-            app_config.set_build_config(Build::new(Some("Dockerfile".to_string()), None))?;
+struct ManifestBuilder {
+    token: String,
+    api_client: APIClient,
+    org_name: String,
+    manifest: Manifest,
+}
 
-            let dockerfile = Path::new("Dockerfile");
-            if !dockerfile.exists() {
-                std::fs::write(dockerfile, "")?;
-                let template = Path::new("../config/templates/Dockerfile.rust");
-
-                std::fs::copy(template, dockerfile)?;
+impl ManifestBuilder {
+    pub fn new(token: String, api_client: APIClient, org_name: String) -> ManifestBuilder {
+        ManifestBuilder {
+            token,
+            api_client,
+            org_name,
+            manifest: Manifest {
+                environment: "".to_string(),
+                service: Service {
+                    name: "".to_string(),
+                    image: "".to_string(),
+                    container_port: 0,
+                    env: DisplayOption(Some(DisplayHashMap(IndexMap::new()))),
+                    secrets: DisplayOption(Some(DisplayHashMap(IndexMap::new()))),
+                }
             }
         }
-
-        println!("Creating service...");
-        println!("{:#?}", app_config);
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct InitPlan {
-    app_name: String,
-
-    docker_file_path: String,
-    application_type: ApplicationType,
-}
-
-struct InitPlanBuilder {
-    app_name: String,
-
-    docker_file_path: String,
-
-    application_type: ApplicationType,
-}
-
-impl InitPlanBuilder {
-    pub fn new() -> InitPlanBuilder {
-        InitPlanBuilder {
-            app_name: "".to_string(),
-            docker_file_path: "".to_string(),
-            application_type: ApplicationType::Unknown,
-        }
     }
 
-    pub fn app_name(mut self, app_name: Option<&str>) -> Self {
-        if app_name.is_none() {
-            let prompt = "Please enter a name for your app: ";
-            let input: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt(prompt)
-                .interact_text()
-                .unwrap();
+    pub fn get_service_name(mut self) -> Result<Self> {
+        self.manifest.service.name = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt("Please enter a name for your service: ")
+            .interact_text()?;
 
-            self.app_name = input;
-            self
-        } else {
-            self.app_name = app_name.unwrap().to_string();
-            self
-        }
+        Ok(self)
     }
 
-    pub fn determine_docker_image_path(mut self) -> Self {
-        let docker_file_exists = Path::new("Dockerfile").exists();
-        if docker_file_exists {
-            self.docker_file_path = "Dockerfile".to_string();
-            return self;
-        }
+    pub fn get_env_name(mut self) -> Result<Self> {
+        let envs = self
+            .api_client
+            .get_environments(&self.token, &self.org_name)?;
 
-        let prompt = "Could not find Dockerfile in current working directory. Please enter the relative path to your Dockerfile: ";
-        let input: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-            .with_prompt(prompt)
-            .interact_text()
-            .unwrap();
+        let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt("Please select the environment to deploy the service in: ")
+            .items(&envs[..])
+            .interact()?;
+        self.manifest.environment = envs[selection].to_string();
 
-        self.docker_file_path = input;
-
-        self
+        Ok(self)
     }
 
-    pub fn determine_application_type(mut self) -> Self {
-        let application_type = scan_directory_for_type();
-
-        self.application_type = application_type;
-        self
-    }
-
-    fn verify(&self) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn build(self) -> Result<InitPlan> {
-        self.verify()?;
-        Ok(InitPlan {
-            app_name: self.app_name,
-            docker_file_path: self.docker_file_path,
-            application_type: self.application_type,
-        })
-    }
-}
-
-impl InitPlan {
-    pub fn builder() -> InitPlanBuilder {
-        InitPlanBuilder::new()
+    pub fn build(self) -> Manifest {
+        self.manifest
     }
 }
 
