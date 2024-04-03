@@ -216,6 +216,7 @@ impl Initialize {
         let manifest = ManifestBuilder::new(token.to_string(), base.api_client(), base.get_org()?)
             .get_env_name()?
             .get_service_name()?
+            .get_port()?
             .build();
 
         let mut file = File::create(file_path)?;
@@ -271,6 +272,14 @@ impl ManifestBuilder {
             .items(&envs[..])
             .interact()?;
         self.manifest.environment = envs[selection].to_string();
+
+        Ok(self)
+    }
+
+    pub fn get_port(mut self) -> Result<Self> {
+        self.manifest.service.container_port = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt("Please enter the port your container is listening on: ")
+            .interact_text()?;
 
         Ok(self)
     }
