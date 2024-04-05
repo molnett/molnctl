@@ -6,18 +6,18 @@ use difference::{Changeset, Difference};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::process::Command;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 use tabled::Table;
 use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::api::APIClient;
 use crate::api::types::{DisplayHashMap, DisplayOption, Service};
+use crate::api::APIClient;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -192,7 +192,12 @@ impl Deploy {
     visible_alias = "init"
 )]
 pub struct Initialize {
-    #[arg(short, long, help = "Path to molnett manifest", default_value("./molnett.yaml"))]
+    #[arg(
+        short,
+        long,
+        help = "Path to molnett manifest",
+        default_value("./molnett.yaml")
+    )]
     manifest: String,
 }
 
@@ -200,7 +205,10 @@ impl Initialize {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         let file_path = Path::new(&self.manifest);
         if file_path.exists() {
-            let prompt = format!("The file {} exists, do you want to overwrite it?", self.manifest);
+            let prompt = format!(
+                "The file {} exists, do you want to overwrite it?",
+                self.manifest
+            );
             let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
                 .with_prompt(prompt)
                 .items(&["no", "yes"])
@@ -255,8 +263,8 @@ impl ManifestBuilder {
                     container_port: 0,
                     env: DisplayOption(Some(DisplayHashMap(IndexMap::new()))),
                     secrets: DisplayOption(Some(DisplayHashMap(IndexMap::new()))),
-                }
-            }
+                },
+            },
         }
     }
 
@@ -283,15 +291,17 @@ impl ManifestBuilder {
     }
 
     pub fn get_port(mut self) -> Result<Self> {
-        self.manifest.service.container_port = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-            .with_prompt("Please enter the port your container is listening on: ")
-            .interact_text()?;
+        self.manifest.service.container_port =
+            Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt("Please enter the port your container is listening on: ")
+                .interact_text()?;
 
         Ok(self)
     }
 
     pub fn get_image(mut self) -> Result<Self> {
-        self.manifest.service.image = get_image_name(&self.api_client, &self.token, &self.org_name)?;
+        self.manifest.service.image =
+            get_image_name(&self.api_client, &self.token, &self.org_name, &None)?;
         Ok(self)
     }
 
@@ -300,26 +310,41 @@ impl ManifestBuilder {
     }
 }
 
-fn get_image_name(api_client: &APIClient, token: &str, org_name: &str) -> Result<String> {
+fn get_image_name(
+    api_client: &APIClient,
+    token: &str,
+    org_name: &str,
+    tag: &Option<String>,
+) -> Result<String> {
     let cur_dir = env::current_dir()?;
     let image_name = if let Some(dir_name) = cur_dir.file_name() {
         dir_name.to_str().unwrap()
     } else {
-        return Err(anyhow!("Unable to get current directory for image name"))
+        return Err(anyhow!("Unable to get current directory for image name"));
     };
     let org_id = api_client.get_org(token, org_name)?.id;
-    let git_output = Command::new("git")
-        .arg("rev-parse")
-        .arg("--short")
-        .arg("HEAD")
-        .output()?;
-    let git_sha = String::from_utf8_lossy(&git_output.stdout);
 
-    return Ok(format!("register.molnett.org/{}/{}:{}", org_id, image_name, git_sha))
+    let image_tag = if tag.is_some() {
+        tag.as_ref().unwrap().to_string()
+    } else {
+        let git_output = Command::new("git")
+            .arg("rev-parse")
+            .arg("--short")
+            .arg("HEAD")
+            .output()?;
+        String::from_utf8_lossy(&git_output.stdout).to_string()
+    };
+
+    return Ok(format!(
+        "register.molnett.org/{}/{}:{}",
+        org_id, image_name, image_tag
+    ));
 }
 
 #[derive(Parser, Debug)]
 pub struct ImageName {
+    #[arg(short, long, help = "Image tag to use")]
+    tag: Option<String>,
 }
 
 impl ImageName {
@@ -328,7 +353,7 @@ impl ImageName {
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
-        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?)?;
+        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?, &self.tag)?;
         println!("{}", image_name);
         Ok(())
     }
