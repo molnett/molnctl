@@ -16,6 +16,7 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
+use crate::api::types::LogLine;
 use crate::api::types::{DisplayHashMap, DisplayOption, Service};
 use crate::api::APIClient;
 
@@ -327,7 +328,9 @@ fn get_image_name(
 
     return Ok(format!(
         "register.molnett.org/{}/{}:{}",
-        org_id, image_name, image_tag.trim()
+        org_id,
+        image_name,
+        image_tag.trim()
     ));
 }
 
@@ -335,7 +338,11 @@ fn get_image_name(
 pub struct ImageName {
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
-    #[arg(short, long, help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name")]
+    #[arg(
+        short,
+        long,
+        help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name"
+    )]
     update_manifest: Option<String>,
 }
 
@@ -455,8 +462,14 @@ impl Logs {
         let (mut socket, _) = connect(builder).expect("Could not connect");
 
         loop {
-            let msg = socket.read().expect("Error reading message");
-            println!("{}", msg.to_string().trim_end());
+            let rawmsg = socket.read().expect("Error reading message").to_string();
+            let msg: LogLine = serde_json::from_str(rawmsg.as_str())?;
+
+            println!(
+                "time=\"{}\" message=\"{}\"",
+                msg.time.unwrap().format("%d/%m/%Y %H:%M:%S"),
+                msg.data
+            );
         }
     }
 }
