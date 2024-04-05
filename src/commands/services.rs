@@ -5,6 +5,8 @@ use dialoguer::{FuzzySelect, Input};
 use difference::{Changeset, Difference};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::env;
+use std::process::Command;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -37,6 +39,7 @@ impl Services {
         match &self.command {
             Some(Commands::Deploy(depl)) => depl.execute(base),
             Some(Commands::Initialize(init)) => init.execute(base),
+            Some(Commands::ImageName(image_name)) => image_name.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
             None => Ok(()),
@@ -50,6 +53,8 @@ pub enum Commands {
     Deploy(Deploy),
     /// Generate Dockerfile and Molnett manifest
     Initialize(Initialize),
+    /// Get the image name that should used to push to the Molnett registry
+    ImageName(ImageName),
     /// List services
     List(List),
     /// Delete a service
@@ -217,6 +222,7 @@ impl Initialize {
             .get_env_name()?
             .get_service_name()?
             .get_port()?
+            .get_image()?
             .build();
 
         let mut file = File::create(file_path)?;
@@ -284,8 +290,47 @@ impl ManifestBuilder {
         Ok(self)
     }
 
+    pub fn get_image(mut self) -> Result<Self> {
+        self.manifest.service.image = get_image_name(&self.api_client, &self.token, &self.org_name)?;
+        Ok(self)
+    }
+
     pub fn build(self) -> Manifest {
         self.manifest
+    }
+}
+
+fn get_image_name(api_client: &APIClient, token: &str, org_name: &str) -> Result<String> {
+    let cur_dir = env::current_dir()?;
+    let image_name = if let Some(dir_name) = cur_dir.file_name() {
+        dir_name.to_str().unwrap()
+    } else {
+        return Err(anyhow!("Unable to get current directory for image name"))
+    };
+    let org_id = api_client.get_org(token, org_name)?.id;
+    let git_output = Command::new("git")
+        .arg("rev-parse")
+        .arg("--short")
+        .arg("HEAD")
+        .output()?;
+    let git_sha = String::from_utf8_lossy(&git_output.stdout);
+
+    return Ok(format!("register.molnett.org/{}/{}:{}", org_id, image_name, git_sha))
+}
+
+#[derive(Parser, Debug)]
+pub struct ImageName {
+}
+
+impl ImageName {
+    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?)?;
+        println!("{}", image_name);
+        Ok(())
     }
 }
 

@@ -21,6 +21,26 @@ impl APIClient {
         }
     }
 
+    pub fn get_org(
+        &self,
+        token: &str,
+        org_name: &str,
+    ) -> anyhow::Result<Organization> {
+        let url = format!("{}/orgs/{}", self.base_url, org_name);
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize org")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
+            _ => Err(anyhow!(
+                "Failed to get org. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
     pub fn get_organizations(
         &self,
         token: &str,
