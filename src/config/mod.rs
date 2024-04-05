@@ -1,12 +1,8 @@
-use std::env::current_dir;
-
 use ::config::ConfigError;
 use camino::{Utf8Path, Utf8PathBuf};
 use dirs_next::config_dir;
 use thiserror::Error;
 
-pub mod application;
-pub mod scan;
 pub mod user;
 
 #[derive(Error, Debug)]
@@ -23,8 +19,6 @@ pub enum Error {
     SerdeJSON(#[from] serde_json::Error),
     #[error(transparent)]
     SerdeYAML(#[from] serde_yaml::Error),
-    #[error("user config not initialized")]
-    UserConfigNotInit,
 }
 
 pub fn default_user_config_path() -> Result<Utf8PathBuf, Error> {
@@ -33,11 +27,6 @@ pub fn default_user_config_path() -> Result<Utf8PathBuf, Error> {
             .map(|path| path.join("molnett").join("config.json"))
             .ok_or(Error::NoDefaultConfigPath)?,
     )?)
-}
-
-pub fn default_app_config_path() -> Result<Utf8PathBuf, Error> {
-    Ok(Utf8PathBuf::try_from(current_dir()?.join("molnett.yaml"))
-        .or(Err(Error::NoDefaultConfigPath))?)
 }
 
 pub fn write_to_disk_json<T>(path: &Utf8Path, config: T) -> Result<(), Error>
@@ -50,22 +39,6 @@ where
 
     let config_file = std::fs::File::create(path)?;
     serde_json::to_writer_pretty(&config_file, &config)?;
-
-    config_file.sync_all()?;
-
-    Ok(())
-}
-
-pub fn write_to_disk_yaml<T>(path: &Utf8Path, config: T) -> Result<(), Error>
-where
-    T: serde::Serialize,
-{
-    if let Some(parent_dir) = path.parent() {
-        std::fs::create_dir_all(parent_dir)?;
-    }
-
-    let config_file = std::fs::File::create(path)?;
-    serde_yaml::to_writer(&config_file, &config)?;
 
     config_file.sync_all()?;
 

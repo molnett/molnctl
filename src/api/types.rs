@@ -47,10 +47,10 @@ pub struct Secret {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct DisplayHashMap(IndexMap<String, String>);
+pub struct DisplayHashMap(pub IndexMap<String, String>);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct DisplayOption<T>(Option<T>);
+pub struct DisplayOption<T>(pub Option<T>);
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()

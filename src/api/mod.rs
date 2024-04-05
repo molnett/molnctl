@@ -21,6 +21,26 @@ impl APIClient {
         }
     }
 
+    pub fn get_org(
+        &self,
+        token: &str,
+        org_name: &str,
+    ) -> anyhow::Result<Organization> {
+        let url = format!("{}/orgs/{}", self.base_url, org_name);
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize org")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
+            _ => Err(anyhow!(
+                "Failed to get org. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
     pub fn get_organizations(
         &self,
         token: &str,
@@ -96,10 +116,20 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-    ) -> Result<Vec<String>, reqwest::Error> {
+    ) -> anyhow::Result<Vec<String>> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-        let response = self.get(&url, token)?.error_for_status()?;
-        response.json()
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize environments")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Organization does not exist")),
+            _ => Err(anyhow!(
+                "Failed to get environments. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
     }
 
     pub fn create_environment(
