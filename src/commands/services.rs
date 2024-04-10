@@ -83,7 +83,7 @@ impl Deploy {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let manifest = self.read_manifest()?;
+        let manifest = read_manifest(&self.manifest)?;
 
         let env_exists = base
             .api_client()
@@ -131,14 +131,6 @@ impl Deploy {
         )?;
         println!("Service {} deployed", result.name);
         Ok(())
-    }
-
-    fn read_manifest(&self) -> Result<Manifest> {
-        let file_path = self.manifest.clone();
-        let mut file_content = String::new();
-        File::open(file_path)?.read_to_string(&mut file_content)?;
-        let manifest = serde_yaml::from_str(&file_content)?;
-        Ok(manifest)
     }
 
     fn user_confirmation(&self) -> usize {
@@ -233,9 +225,7 @@ impl Initialize {
             .get_image()?
             .build();
 
-        let mut file = File::create(file_path)?;
-        let yaml = serde_yaml::to_string(&manifest)?;
-        file.write_all(yaml.as_bytes())?;
+        write_manifest(&self.manifest, &manifest)?;
 
         println!("Wrote manifest to {}...", &self.manifest);
         Ok(())
@@ -337,7 +327,7 @@ fn get_image_name(
 
     return Ok(format!(
         "register.molnett.org/{}/{}:{}",
-        org_id, image_name, image_tag
+        org_id, image_name, image_tag.trim()
     ));
 }
 
@@ -345,6 +335,8 @@ fn get_image_name(
 pub struct ImageName {
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
+    #[arg(short, long, help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name")]
+    update_manifest: Option<String>,
 }
 
 impl ImageName {
@@ -353,7 +345,14 @@ impl ImageName {
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
         let image_name = get_image_name(&base.api_client(), token, &base.get_org()?, &self.tag)?;
+        if let Some(path) = self.update_manifest.clone() {
+            let mut manifest = read_manifest(&path)?;
+            manifest.service.image = image_name.clone();
+            write_manifest(&path, &manifest)?;
+        }
+
         println!("{}", image_name);
         Ok(())
     }
@@ -434,7 +433,7 @@ impl Logs {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let manifest = self.read_manifest()?;
+        let manifest = read_manifest(&self.manifest)?;
         let logurl: Uri = url::Url::parse(
             format!(
                 "{}/orgs/{}/envs/{}/svcs/{}/logs",
@@ -460,12 +459,18 @@ impl Logs {
             println!("{}", msg.to_string().trim_end());
         }
     }
+}
 
-    fn read_manifest(&self) -> Result<Manifest> {
-        let file_path = self.manifest.clone();
-        let mut file_content = String::new();
-        File::open(file_path)?.read_to_string(&mut file_content)?;
-        let manifest = serde_yaml::from_str(&file_content)?;
-        Ok(manifest)
-    }
+fn read_manifest(path: &str) -> Result<Manifest> {
+    let mut file_content = String::new();
+    File::open(path)?.read_to_string(&mut file_content)?;
+    let manifest = serde_yaml::from_str(&file_content)?;
+    Ok(manifest)
+}
+
+fn write_manifest(path: &str, manifest: &Manifest) -> Result<()> {
+    let mut file = File::create(path)?;
+    let yaml = serde_yaml::to_string(manifest)?;
+    file.write_all(yaml.as_bytes())?;
+    Ok(())
 }
