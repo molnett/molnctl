@@ -17,6 +17,7 @@ Once you have Rust setup, a simple `cargo build --release` should produce your v
 ## Use with Github Actions
 
 We created a Github Action to make it easy to use molnctl in your builds, see [setup-molnctl-action](https://github.com/molnett/setup-molnctl-action).
+There is also a Github Action for working with ephemeral environments, see [ephemeral-environment-action](https://github.com/molnett/ephemeral-environment-action)
 
 ## Usage
 

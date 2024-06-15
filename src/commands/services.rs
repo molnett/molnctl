@@ -291,7 +291,7 @@ impl ManifestBuilder {
 
     pub fn get_image(mut self) -> Result<Self> {
         self.manifest.service.image =
-            get_image_name(&self.api_client, &self.token, &self.org_name, &None)?;
+            get_image_name(&self.api_client, &self.token, &self.org_name, &None, &None)?;
         Ok(self)
     }
 
@@ -305,12 +305,18 @@ fn get_image_name(
     token: &str,
     org_name: &str,
     tag: &Option<String>,
+    name: &Option<String>,
 ) -> Result<String> {
-    let cur_dir = env::current_dir()?;
-    let image_name = if let Some(dir_name) = cur_dir.file_name() {
-        dir_name.to_str().unwrap()
+    let image_name = if name.is_some() {
+        name.as_ref().unwrap().to_string()
     } else {
-        return Err(anyhow!("Unable to get current directory for image name"));
+        let cur_dir = env::current_dir()?;
+        let image_name = if let Some(dir_name) = cur_dir.file_name() {
+            dir_name.to_str().unwrap()
+        } else {
+            return Err(anyhow!("Unable to get current directory for image name"));
+        };
+        image_name.to_string()
     };
     let org_id = api_client.get_org(token, org_name)?.id;
 
@@ -337,6 +343,8 @@ pub struct ImageName {
     tag: Option<String>,
     #[arg(short, long, help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name")]
     update_manifest: Option<String>,
+    #[arg(short, long, help = "Override image name. Default is directory name")]
+    image_name: Option<String>,
 }
 
 impl ImageName {
@@ -346,7 +354,7 @@ impl ImageName {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?, &self.tag)?;
+        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?, &self.tag, &self.image_name)?;
         if let Some(path) = self.update_manifest.clone() {
             let mut manifest = read_manifest(&path)?;
             manifest.service.image = image_name.clone();

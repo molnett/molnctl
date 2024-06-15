@@ -43,7 +43,6 @@ impl Token {
 }
 
 pub struct UserConfigLoader {
-    pub path: Utf8PathBuf,
 }
 
 impl UserConfig {
