@@ -440,7 +440,9 @@ impl Logs {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let manifest = read_manifest(&self.manifest)?;
+        let manifest = read_manifest(&self.manifest)
+            .expect(format!("Could not read manifest file {}", self.manifest).as_str());
+
         let logurl: Uri = url::Url::parse(
             format!(
                 "{}/orgs/{}/envs/{}/svcs/{}/logs",
