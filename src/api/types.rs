@@ -1,6 +1,7 @@
-use std::fmt::{Display, Formatter, Result};
+use chrono::{serde::ts_seconds_option, DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result};
 use tabled::Tabled;
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
@@ -17,12 +18,12 @@ pub struct ListOrganizationResponse {
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct CreateEnvironmentResponse {
-    pub name: String
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListServicesResponse {
-    pub services: Vec<Service>
+    pub services: Vec<Service>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Tabled, Clone, PartialEq)]
@@ -33,17 +34,24 @@ pub struct Service {
     #[serde(default, skip_serializing_if = "is_default")]
     pub env: DisplayOption<DisplayHashMap>,
     #[serde(default, skip_serializing_if = "is_default")]
-    pub secrets: DisplayOption<DisplayHashMap>
+    pub secrets: DisplayOption<DisplayHashMap>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListSecretsResponse {
-    pub secrets: Vec<Secret>
+    pub secrets: Vec<Secret>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct Secret {
     pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LogLine {
+    pub data: String,
+    #[serde(with = "ts_seconds_option")]
+    pub time: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -59,7 +67,7 @@ fn is_default<T: Default + PartialEq>(t: &T) -> bool {
 impl Display for DisplayOption<DisplayHashMap> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if self.0.is_none() {
-            return Ok(())
+            return Ok(());
         }
 
         let hashmap = self.0.as_ref().unwrap();
