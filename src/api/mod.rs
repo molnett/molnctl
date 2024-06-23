@@ -137,10 +137,14 @@ impl APIClient {
         token: &str,
         name: &str,
         org_name: &str,
+        copy_from: Option<&str>,
     ) -> anyhow::Result<CreateEnvironmentResponse> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
         let mut body = HashMap::new();
         body.insert("name", name);
+        if let Some(copy_from) = copy_from {
+            body.insert("copy_from", copy_from);
+        }
         let response = self.post(&url, token, &body)?;
         match response.status() {
             StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)

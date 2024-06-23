@@ -17,7 +17,9 @@ pub struct ListOrganizationResponse {
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct CreateEnvironmentResponse {
-    pub name: String
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub copy_from: DisplayOption<String>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,5 +76,14 @@ impl Display for DisplayOption<DisplayHashMap> {
         }
 
         Ok(())
+    }
+}
+
+impl<T: Display> Display for DisplayOption<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match &self.0 {
+            Some(value) => write!(f, "{}", value),
+            None => Ok(()),
+        }
     }
 }
