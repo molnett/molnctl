@@ -47,7 +47,7 @@ pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
 
-    #[clap(long, help = "Copy from an existing environment", num_args(0..=1), require_equals(true), value_name = "ENV_NAME",)]
+    #[arg(long, help = "Copy from an existing environment", num_args(0..=1), require_equals(true), value_name = "ENV_NAME",)]
     copy_from: Option<String>,
 }
 
