@@ -46,6 +46,9 @@ pub enum Commands {
 pub struct Create {
     #[arg(help = "Name of the environment to create")]
     name: String,
+
+    #[arg(long, help = "Copy from an existing environment", num_args(0..=1), require_equals(true), value_name = "ENV_NAME",)]
+    copy_from: Option<String>,
 }
 
 impl Create {
@@ -58,7 +61,7 @@ impl Create {
 
         let response = base
             .api_client()
-            .create_environment(token, &self.name, &org_name)?;
+            .create_environment(token, &self.name, &org_name, self.copy_from.as_deref())?;
 
         let table = Table::new([response]).to_string();
         println!("{}", table);
