@@ -105,20 +105,36 @@ impl Delete {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        if let Some(false) = self.no_confirm {
-            let prompt = format!("Org: {}, Environment: {}. Are you sure you want to delete this environment and everything in it?", org_name, self.name);
-            FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt(prompt)
-                .items(&["no", "yes"])
-                .default(0)
-                .interact()
-                .unwrap();
+        if !self.confirm_deletion(&org_name)? {
+            println!("Delete cancelled");
+            return Ok(());
         }
+    
 
         base.api_client()
             .delete_environment(token, &org_name, &self.name)?;
 
         println!("Environment {} deleted", self.name);
         Ok(())
+    }
+
+    fn confirm_deletion(&self, org_name: &str) -> Result<bool> {
+        if self.no_confirm == Some(true) {
+            return Ok(true);
+        }
+
+        let prompt = format!(
+            "Org: {}, Environment: {}.\nAre you sure you want to delete this environment and everything in it?",
+            org_name, self.name
+        );
+
+        let options = ["no", "yes"];
+        let selected = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            .with_prompt(prompt)
+            .items(&options)
+            .default(0)
+            .interact()?;
+
+        Ok(options[selected] == "yes")
     }
 }
