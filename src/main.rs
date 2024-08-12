@@ -1,8 +1,14 @@
 use crate::config::user::UserConfig;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use commands::CommandBase;
+use dialoguer::console::style;
+use semver::Version;
+use serde_json::Value;
+use reqwest::blocking::Client;
+
+
 mod api;
 mod commands;
 mod config;
@@ -68,6 +74,13 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+
+    let current_version = env!("CARGO_PKG_VERSION");
+    if let Ok(Some(new_version)) = check_newer_release(current_version) {
+        let message = style(format!("A new version ({}) is available at https://github.com/molnett/molnctl - you are running {}\n", new_version, current_version));
+        println!("{}", message.bold().green());
+    }
+
     let cli = Cli::parse();
 
     if let Some(config_path) = cli.config.as_deref() {
@@ -87,5 +100,34 @@ fn main() -> Result<()> {
         Some(Commands::Secrets(secrets)) => secrets.execute(&mut base),
         Some(Commands::Services(svcs)) => svcs.execute(&mut base),
         None => Ok(()),
+    }
+}
+
+pub fn check_newer_release(current_version: &str) -> Result<Option<String>> {
+    let client = Client::new();
+    let url = "https://api.github.com/repos/molnett/molnctl/releases/latest";
+    
+    let response = client
+        .get(url)
+        .header("User-Agent", "molnctl")
+        .send()?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!("Failed to fetch release info: HTTP {}", response.status()));
+    }
+
+    let body: Value = response.json()?;
+    let latest_version = body["tag_name"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Failed to parse latest version"))?
+        .trim_start_matches('v');
+
+    let current = Version::parse(current_version)?;
+    let latest = Version::parse(latest_version)?;
+
+    if latest > current {
+        Ok(Some(latest_version.to_string()))
+    } else {
+        Ok(None)
     }
 }

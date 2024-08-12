@@ -892,7 +892,7 @@ dependencies = [
 
 [[package]]
 name = "molnctl"
-version = "0.1.12"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "camino",
@@ -907,6 +907,7 @@ dependencies = [
  "oauth2",
  "once_cell",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1428,6 +1429,15 @@ checksum = "e932934257d3b408ed8f30db49d85ea163bfe74961f017f405b025af298f0c7a"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "semver"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
