@@ -76,37 +76,40 @@ impl Login {
         println!("Browse to: {}", auth_url);
 
         println!("Listening on {}", server.server_addr());
-        for request in server.incoming_requests() {
-            let url = request.url();
+        let request = server
+            .incoming_requests()
+            .next()
+            .expect("server shutting down");
+        let url = request.url();
 
-            let code = url.split("?code=").collect::<Vec<&str>>()[1];
+        let code = url.split("?code=").collect::<Vec<&str>>()[1];
 
-            let oauthtoken = client
-                .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-                .set_pkce_verifier(pkce_verifier)
-                .request(http_client)
-                .unwrap();
+        let oauthtoken = client
+            .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .set_pkce_verifier(pkce_verifier)
+            .request(http_client)
+            .unwrap();
 
-            let mut token = Token::new();
+        let mut token = Token::new();
 
-            token.access_token = oauthtoken.access_token().secret().to_string();
-            if let Some(refresh_token) = oauthtoken.refresh_token() {
-                token.refresh_token = Some(refresh_token.secret().to_string());
-            }
-            // TODO: the api returns "expiry":"2024-01-01T11:03:53.485518152+01:00"
-            if let Some(expires_in) = oauthtoken.expires_in() {
-                token.expiry =
-                    Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
-            } else {
-                token.expiry = Some(Utc::now() + chrono::Duration::hours(1));
-            }
-
-            base.user_config_mut().write_token(token)?;
-
-            request.respond(Response::from_string("Success! You can close this tab now"))?;
-
-            return Ok(());
+        token.access_token = oauthtoken.access_token().secret().to_string();
+        if let Some(refresh_token) = oauthtoken.refresh_token() {
+            token.refresh_token = Some(refresh_token.secret().to_string());
         }
+        // TODO: the api returns "expiry":"2024-01-01T11:03:53.485518152+01:00"
+        if let Some(expires_in) = oauthtoken.expires_in() {
+            token.expiry =
+                Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
+        } else {
+            token.expiry = Some(Utc::now() + chrono::Duration::hours(1));
+        }
+
+        base.user_config_mut().write_token(token)?;
+
+        request.respond(Response::from_string("Success! You can close this tab now"))?;
+
+        return Ok(());
+
         Ok(())
     }
 }

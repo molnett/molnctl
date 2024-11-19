@@ -21,11 +21,7 @@ impl APIClient {
         }
     }
 
-    pub fn get_org(
-        &self,
-        token: &str,
-        org_name: &str,
-    ) -> anyhow::Result<Organization> {
+    pub fn get_org(&self, token: &str, org_name: &str) -> anyhow::Result<Organization> {
         let url = format!("{}/orgs/{}", self.base_url, org_name);
         let response = self.get(&url, token)?;
         match response.status() {
@@ -83,6 +79,7 @@ impl APIClient {
     ) -> anyhow::Result<ListServicesResponse> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let response: String = self.get(&url, token)?.error_for_status()?.text()?;
+        println!("{}", response.clone());
         serde_json::from_str(response.as_str()).with_context(|| "Failed to deserialize response")
     }
 
@@ -116,12 +113,16 @@ impl APIClient {
         &self,
         token: &str,
         org_name: &str,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<ListEnvironmentsResponse> {
         let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
         let response = self.get(&url, token)?;
         match response.status() {
-            StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
-                .with_context(|| "Failed to deserialize environments")?),
+            StatusCode::OK => {
+                let text = &response.text()?;
+                println!("{}", text);
+                Ok(serde_json::from_str(text)
+                    .with_context(|| "Failed to deserialize environments")?)
+            }
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Organization does not exist")),
             _ => Err(anyhow!(

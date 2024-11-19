@@ -88,7 +88,9 @@ impl Deploy {
         let env_exists = base
             .api_client()
             .get_environments(token, &org_name)?
-            .contains(&manifest.environment);
+            .environments
+            .iter()
+            .any(|env| env.name == manifest.environment);
         if !env_exists {
             return Err(anyhow!(
                 "Environment {} does not exist",
@@ -129,7 +131,7 @@ impl Deploy {
             &manifest.environment,
             manifest.service,
         )?;
-        println!("Service {} deployed", result.name);
+        println!("Service deployed.");
         Ok(())
     }
 
@@ -273,9 +275,21 @@ impl ManifestBuilder {
 
         let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
             .with_prompt("Please select the environment to deploy the service in: ")
-            .items(&envs[..])
+            .items(
+                &envs
+                    .environments
+                    .iter()
+                    .map(|env| env.name.clone())
+                    .collect::<Vec<String>>(),
+            )
             .interact()?;
-        self.manifest.environment = envs[selection].to_string();
+        self.manifest.environment = envs
+            .environments
+            .iter()
+            .filter(|env| env.name == selection.to_string())
+            .map(|env| env.name.clone())
+            .collect::<Vec<String>>()[0]
+            .clone();
 
         Ok(self)
     }
@@ -333,7 +347,9 @@ fn get_image_name(
 
     return Ok(format!(
         "register.molnett.org/{}/{}:{}",
-        org_id, image_name, image_tag.trim()
+        org_id,
+        image_name,
+        image_tag.trim()
     ));
 }
 
@@ -341,7 +357,11 @@ fn get_image_name(
 pub struct ImageName {
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
-    #[arg(short, long, help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name")]
+    #[arg(
+        short,
+        long,
+        help = "Path to a molnett manifest. The manifest's image field will be updated to the returned image name"
+    )]
     update_manifest: Option<String>,
     #[arg(short, long, help = "Override image name. Default is directory name")]
     image_name: Option<String>,
@@ -354,7 +374,13 @@ impl ImageName {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let image_name = get_image_name(&base.api_client(), token, &base.get_org()?, &self.tag, &self.image_name)?;
+        let image_name = get_image_name(
+            &base.api_client(),
+            token,
+            &base.get_org()?,
+            &self.tag,
+            &self.image_name,
+        )?;
         if let Some(path) = self.update_manifest.clone() {
             let mut manifest = read_manifest(&path)?;
             manifest.service.image = image_name.clone();
