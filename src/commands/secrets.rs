@@ -1,7 +1,7 @@
+use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
-use super::CommandBase;
 use std::io::{self, BufRead};
 use tabled::Table;
 
@@ -25,7 +25,7 @@ impl Secrets {
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
@@ -38,7 +38,7 @@ pub enum Commands {
     /// List secrets
     List(List),
     /// Delete a secret
-    Delete(Delete)
+    Delete(Delete),
 }
 
 #[derive(Debug, Parser)]
@@ -68,31 +68,26 @@ impl Create {
                 .expect("Failed to get user input")
         };
 
-        base.api_client().create_secret(
-            token,
-            &org_name,
-            &self.env,
-            &self.name,
-            &value
-        )?;
+        base.api_client()
+            .create_secret(token, &org_name, &self.env, &self.name, &value)?;
 
         println!("Secret {} created", &self.name);
         Ok(())
     }
 
     fn read_stdin(&self) -> Result<String> {
-        let mut lines = io::stdin().lock().lines();
+        let lines = io::stdin().lock().lines();
         let mut user_input = String::new();
 
-        while let Some(line) = lines.next() {
+        for line in lines {
             let last_input = line.unwrap();
 
-            if last_input.len() == 0 {
+            if last_input.is_empty() {
                 break;
             }
 
-            if user_input.len() > 0 {
-                user_input.push_str("\n");
+            if !user_input.is_empty() {
+                user_input.push('\n');
             }
 
             user_input.push_str(&last_input);
@@ -116,11 +111,7 @@ impl List {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().get_secrets(
-            token,
-            &org_name,
-            &self.env
-        )?;
+        let response = base.api_client().get_secrets(token, &org_name, &self.env)?;
 
         let table = Table::new(response.secrets).to_string();
         println!("{}", table);
@@ -157,12 +148,8 @@ impl Delete {
                 .unwrap();
         }
 
-        base.api_client().delete_secret(
-            token,
-            &org_name,
-            &self.env,
-            &self.name
-        )?;
+        base.api_client()
+            .delete_secret(token, &org_name, &self.env, &self.name)?;
 
         println!("Secret {} deleted", self.name);
         Ok(())

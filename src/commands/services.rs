@@ -125,7 +125,7 @@ impl Deploy {
             }
         }
 
-        let result = base.api_client().deploy_service(
+        let _result = base.api_client().deploy_service(
             token,
             &org_name,
             &manifest.environment,
@@ -154,8 +154,8 @@ impl Deploy {
                 ))
             }
         };
-        for i in 0..diffs.len() {
-            match diffs[i] {
+        for diff in &diffs {
+            match diff {
                 Difference::Same(ref x) => {
                     t.reset().unwrap();
                     writeln!(t, " {}", x)?;
@@ -345,12 +345,12 @@ fn get_image_name(
         String::from_utf8_lossy(&git_output.stdout).to_string()
     };
 
-    return Ok(format!(
+    Ok(format!(
         "register.molnett.org/{}/{}:{}",
         org_id,
         image_name,
         image_tag.trim()
-    ));
+    ))
 }
 
 #[derive(Parser, Debug)]

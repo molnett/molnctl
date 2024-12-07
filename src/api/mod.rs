@@ -187,7 +187,7 @@ impl APIClient {
         org_name: &str,
         env_name: &str,
         service: Service,
-    ) -> anyhow::Result<Service> {
+    ) -> anyhow::Result<DeployServiceResponse> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;

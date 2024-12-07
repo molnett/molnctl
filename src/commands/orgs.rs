@@ -5,8 +5,7 @@ use tabled::Table;
 
 use super::CommandBase;
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 #[command(
     author,
     version,
@@ -22,16 +21,15 @@ pub struct Orgs {
 impl Orgs {
     pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
         match &self.command {
-            Some(Commands::List(list)) => list.execute(&base),
-            Some(Commands::Create(create)) => create.execute(&base),
+            Some(Commands::List(list)) => list.execute(base),
+            Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::Switch(switch)) => switch.execute(base),
             None => Ok(()),
         }
     }
 }
 
-#[derive(Subcommand)]
-#[derive(Debug)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// List your orgs
     List(List),
@@ -41,8 +39,7 @@ pub enum Commands {
     Switch(Switch),
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct List {}
 
 impl List {
@@ -61,8 +58,7 @@ impl List {
     }
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct Create {
     #[clap(short, long)]
     name: Option<String>,
@@ -123,11 +119,11 @@ impl CreatePlanBuilder {
                 .unwrap();
 
             self.name = input;
-            return self;
         } else {
             self.name = name.unwrap().to_string();
-            return self;
         }
+
+        self
     }
 
     pub fn billing_email(mut self, billing_email: Option<&str>) -> Self {
@@ -143,7 +139,8 @@ impl CreatePlanBuilder {
             .unwrap();
 
         self.billing_email = input;
-        return self;
+
+        self
     }
 
     fn verify(&self) -> Result<()> {
@@ -165,8 +162,7 @@ impl CreatePlan {
     }
 }
 
-#[derive(Parser)]
-#[derive(Debug)]
+#[derive(Parser, Debug)]
 pub struct Switch {
     #[arg(help = "Name of the org to switch to")]
     org: Option<String>,
@@ -188,7 +184,10 @@ impl Switch {
             if org_names.contains(&arg_org.as_str()) {
                 arg_org
             } else {
-                return Err(anyhow!("organization {} does not exist or you do not have access to it", arg_org))
+                return Err(anyhow!(
+                    "organization {} does not exist or you do not have access to it",
+                    arg_org
+                ));
             }
         } else {
             let selection = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())

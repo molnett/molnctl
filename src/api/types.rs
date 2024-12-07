@@ -51,7 +51,7 @@ pub struct Service {
     pub secrets: DisplayOption<DisplayHashMap>,
 }
 
-/*#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DeployServiceResponse {
     pub id: String,
     pub status: String,
@@ -61,7 +61,7 @@ pub struct DeployServiceResponse {
     pub end_time: Option<OffsetDateTime>,
     pub error: Option<String>,
 }
-*/
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListSecretsResponse {
     pub secrets: Vec<Secret>,

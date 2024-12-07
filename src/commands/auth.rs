@@ -108,8 +108,6 @@ impl Login {
 
         request.respond(Response::from_string("Success! You can close this tab now"))?;
 
-        return Ok(());
-
         Ok(())
     }
 }

@@ -4,10 +4,9 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use commands::CommandBase;
 use dialoguer::console::style;
+use reqwest::blocking::Client;
 use semver::Version;
 use serde_json::Value;
-use reqwest::blocking::Client;
-
 
 mod api;
 mod commands;
@@ -74,7 +73,6 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-
     let current_version = env!("CARGO_PKG_VERSION");
     if let Ok(Some(new_version)) = check_newer_release(current_version) {
         let message = style(format!("A new version ({}) is available at https://github.com/molnett/molnctl - you are running {}\n", new_version, current_version));
@@ -93,8 +91,8 @@ fn main() -> Result<()> {
     match cli.command {
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Environments(environments)) => environments.execute(&mut base),
-        Some(Commands::Deploy(deploy)) => deploy.execute(&mut base),
-        Some(Commands::Logs(logs)) => logs.execute(&mut base),
+        Some(Commands::Deploy(deploy)) => deploy.execute(&base),
+        Some(Commands::Logs(logs)) => logs.execute(&base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
         Some(Commands::Secrets(secrets)) => secrets.execute(&mut base),
@@ -106,14 +104,14 @@ fn main() -> Result<()> {
 pub fn check_newer_release(current_version: &str) -> Result<Option<String>> {
     let client = Client::new();
     let url = "https://api.github.com/repos/molnett/molnctl/releases/latest";
-    
-    let response = client
-        .get(url)
-        .header("User-Agent", "molnctl")
-        .send()?;
+
+    let response = client.get(url).header("User-Agent", "molnctl").send()?;
 
     if !response.status().is_success() {
-        return Err(anyhow!("Failed to fetch release info: HTTP {}", response.status()));
+        return Err(anyhow!(
+            "Failed to fetch release info: HTTP {}",
+            response.status()
+        ));
     }
 
     let body: Value = response.json()?;
