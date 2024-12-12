@@ -125,13 +125,14 @@ impl Deploy {
             }
         }
 
-        let _result = base.api_client().deploy_service(
+        let result = base.api_client().deploy_service(
             token,
             &org_name,
             &manifest.environment,
             manifest.service,
         )?;
-        println!("Service deployed.");
+
+        println!("{:?}", result);
         Ok(())
     }
 

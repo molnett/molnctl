@@ -59,9 +59,12 @@ impl Create {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base
-            .api_client()
-            .create_environment(token, &self.name, &org_name, self.copy_from.as_deref())?;
+        let response = base.api_client().create_environment(
+            token,
+            &self.name,
+            &org_name,
+            self.copy_from.as_deref(),
+        )?;
 
         let table = Table::new([response]).to_string();
         println!("{}", table);
@@ -83,7 +86,8 @@ impl List {
 
         let response = base.api_client().get_environments(token, &org_name)?;
 
-        println!("{:?}", response);
+        let table = Table::new(response.environments).to_string();
+        println!("{}", table);
 
         Ok(())
     }
@@ -109,7 +113,6 @@ impl Delete {
             println!("Delete cancelled");
             return Ok(());
         }
-    
 
         base.api_client()
             .delete_environment(token, &org_name, &self.name)?;

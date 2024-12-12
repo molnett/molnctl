@@ -79,7 +79,6 @@ impl APIClient {
     ) -> anyhow::Result<ListServicesResponse> {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let response: String = self.get(&url, token)?.error_for_status()?.text()?;
-        println!("{}", response.clone());
         serde_json::from_str(response.as_str()).with_context(|| "Failed to deserialize response")
     }
 
@@ -119,7 +118,6 @@ impl APIClient {
         match response.status() {
             StatusCode::OK => {
                 let text = &response.text()?;
-                println!("{}", text);
                 Ok(serde_json::from_str(text)
                     .with_context(|| "Failed to deserialize environments")?)
             }
@@ -191,16 +189,19 @@ impl APIClient {
         let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;
-        match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
-                .with_context(|| "Failed to deserialize service")?),
+        let status = response.status();
+        let text = response.text()?;
+        match status {
+            StatusCode::CREATED => {
+                Ok(serde_json::from_str(&text).with_context(|| "Failed to deserialize service")?)
+            }
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
             StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
-            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", text)),
             _ => Err(anyhow!(
                 "Failed to deploy service. API returned {} - {}",
-                response.status(),
-                response.text()?
+                status,
+                text
             )),
         }
     }
