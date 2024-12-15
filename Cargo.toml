@@ -33,3 +33,9 @@ tungstenite = { git = "https://github.com/snapview/tungstenite-rs", rev = "0fa41
     "native-tls",
 ] }
 url = "2.5.0"
+
+[dependencies.openssl]
+version = "0.10"
+features = [
+    "vendored"
+]
