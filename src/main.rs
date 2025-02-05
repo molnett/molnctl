@@ -59,7 +59,7 @@ enum Commands {
     /// Create and manage environments
     Environments(commands::environments::Environments),
     /// Deploy a service
-    Deploy(commands::services::Deploy),
+    //Deploy(commands::services::Deploy),
     /// Tail logs from a service
     Logs(commands::services::Logs),
     /// Generate Dockerfile and Molnett manifest
@@ -91,7 +91,7 @@ fn main() -> Result<()> {
     match cli.command {
         Some(Commands::Auth(auth)) => auth.execute(&mut base),
         Some(Commands::Environments(environments)) => environments.execute(&mut base),
-        Some(Commands::Deploy(deploy)) => deploy.execute(&base),
+        //Some(Commands::Deploy(deploy)) => deploy.execute(&base),
         Some(Commands::Logs(logs)) => logs.execute(&base),
         Some(Commands::Initialize(init)) => init.execute(&mut base),
         Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
