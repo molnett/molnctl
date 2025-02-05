@@ -40,9 +40,9 @@ pub struct ListServicesResponse {
     pub services: Vec<Service>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
-pub enum Value {
+enum Value {
     String(String),
     SecretRef {
         #[serde(rename = "secretRef")]
@@ -50,19 +50,10 @@ pub enum Value {
     },
 }
 
-impl Default for Value {
-    fn default() -> Self {
-        Value::String(String::default())
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Value::String(s) => write!(f, "{}", s),
-            Value::SecretRef { secret_ref } => write!(f, "secretRef: {}", secret_ref),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct EnvironmentValue {
+    pub is_secret: bool,
+    pub value: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Tabled, Clone, PartialEq)]
@@ -71,9 +62,27 @@ pub struct Service {
     pub image: String,
     pub container_port: u16,
     #[serde(default, skip_serializing_if = "is_default")]
-    pub env: DisplayOption<DisplayHashMap<Value>>,
+    pub env: DisplayOption<DisplayHashMap<String>>,
     #[serde(default, skip_serializing_if = "is_default")]
     pub secrets: DisplayOption<DisplayHashMap<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ComposeService {
+    pub name: String,
+    pub image: String,
+    pub ports: Vec<Port>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub environment: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub secrets: DisplayOption<DisplayHashMap<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Port {
+    pub target: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

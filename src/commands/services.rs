@@ -15,7 +15,7 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::api::types::{DisplayHashMap, DisplayOption, Service, Value};
+use crate::api::types::{DisplayHashMap, DisplayOption, Service, ComposeService, Port};
 use crate::api::APIClient;
 use difference::{Changeset, Difference};
 use term;
@@ -116,36 +116,8 @@ impl Deploy {
                 container_port: compose_service.ports.first()
                     .map(|p| p.target)
                     .unwrap_or(80),
-                env: {
-                    let mut env_map = IndexMap::new();
-                    if let Some(env) = &compose_service.environment.0 {
-                        for (k, v) in env.0.iter() {
-                            if let Value::String(value) = v {
-                                env_map.insert(k.clone(), Value::String(value.clone()));
-                            }
-                        }
-                    }
-                    DisplayOption(if env_map.is_empty() {
-                        None
-                    } else {
-                        Some(DisplayHashMap(env_map))
-                    })
-                },
-                secrets: {
-                    let mut secrets_map = IndexMap::new();
-                    if let Some(env) = &compose_service.environment.0 {
-                        for (k, v) in env.0.iter() {
-                            if let Value::SecretRef { secret_ref } = v {
-                                secrets_map.insert(secret_ref.clone(), String::new());
-                            }
-                        }
-                    }
-                    DisplayOption(if secrets_map.is_empty() {
-                        None
-                    } else {
-                        Some(DisplayHashMap(secrets_map))
-                    })
-                },
+                env: compose_service.environment.clone(),
+                secrets: compose_service.secrets.clone(),
             };
 
             let response = base.api_client().get_service(
@@ -158,43 +130,22 @@ impl Deploy {
             if let Some(false) = self.no_confirm {
                 let existing_svc_yaml = match response? {
                     Some(existing_service) => {
-                        // Convert existing service back to ComposeService for comparison
+                        // Convert existing service to ComposeService for comparison
                         let existing_compose_service = ComposeService {
-                            name: existing_service.name.clone(),
-                            image: existing_service.image.clone(),
+                            name: existing_service.name,
+                            image: existing_service.image,
                             ports: vec![Port {
                                 target: existing_service.container_port,
                                 published: None,
                             }],
-                            environment: {
-                                let mut environment = IndexMap::new();
-                                if let Some(env_map) = &existing_service.env.0 {
-                                    for (k, v) in env_map.0.iter() {
-                                        environment.insert(k.clone(), v.clone());
-                                    }
-                                }
-                                // Add secrets as secretRef
-                                if let Some(secrets_map) = &existing_service.secrets.0 {
-                                    for (secret_name, _) in secrets_map.0.iter() {
-                                        environment.insert(
-                                            secret_name.clone(),
-                                            Value::SecretRef { secret_ref: secret_name.clone() },
-                                        );
-                                    }
-                                }
-                                DisplayOption(if environment.is_empty() {
-                                    None
-                                } else {
-                                    Some(DisplayHashMap(environment))
-                                })
-                            },
+                            environment: existing_service.env.clone(),
+                            secrets: existing_service.secrets.clone(),
                         };
 
                         if existing_compose_service == *compose_service {
                             println!("No changes detected for service {}", service_name);
                             continue;
                         }
-
                         serde_yaml::to_string(&existing_compose_service)?
                     }
                     None => String::new(),
@@ -323,19 +274,15 @@ struct ComposeFile {
     services: Vec<ComposeService>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct ComposeService {
-    name: String,
-    image: String,
-    ports: Vec<Port>,
-    environment: DisplayOption<DisplayHashMap<Value>>,
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Port {
-    target: u16,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    published: Option<u16>,
+#[serde(untagged)]
+enum Value {
+    String(String),
+    SecretRef {
+        #[serde(rename = "secretRef")]
+        secret_ref: String,
+    },
 }
 
 struct ComposeBuilder {
@@ -385,6 +332,7 @@ impl ComposeBuilder {
                     published: None,
                 }],
                 environment: DisplayOption(None),
+                secrets: DisplayOption(None),
             };
 
             // Ask for environment variables
@@ -395,7 +343,7 @@ impl ComposeBuilder {
                 .interact()?;
 
             if add_env == 1 {
-                let mut env_values = IndexMap::new();
+                let mut environment = IndexMap::new();
                 loop {
                     let key: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
                         .with_prompt("Enter environment variable name (empty to finish)")
@@ -416,18 +364,18 @@ impl ComposeBuilder {
                         let secret_name: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
                             .with_prompt("Enter secret name")
                             .interact_text()?;
-                        Value::SecretRef { secret_ref: secret_name }
+                        secret_name
                     } else {
                         let value: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
                             .with_prompt("Enter environment variable value")
                             .interact_text()?;
-                        Value::String(value)
+                        value
                     };
 
-                    env_values.insert(key, value);
+                    environment.insert(key, value);
                 }
-                if !env_values.is_empty() {
-                    service.environment = DisplayOption(Some(DisplayHashMap(env_values)));
+                if !environment.is_empty() {
+                    service.environment = DisplayOption(Some(DisplayHashMap(environment)));
                 }
             }
 
@@ -664,7 +612,7 @@ fn read_manifest(path: &str) -> Result<ComposeFile> {
         Err(e) => println!("Failed to parse as compose file: {}", e),
     }
 
-    println!("Trying deprecated manifest format");
+    println!("Trying old manifest format");
     // If not a compose file, try to parse as our old manifest format
     let manifest: Manifest = serde_yaml::from_str(&file_content)
         .map_err(|e| anyhow!("Failed to parse manifest: {}", e))?;
@@ -677,30 +625,14 @@ fn read_manifest(path: &str) -> Result<ComposeFile> {
             target: manifest.service.container_port,
             published: None,
         }],
-        environment: {
+        environment: DisplayOption(manifest.service.env.0.map(|env_map| {
             let mut environment = IndexMap::new();
-            if let Some(env_map) = &manifest.service.env.0 {
-                for (k, v) in env_map.0.iter() {
-                    if let Value::String(value) = v {
-                        environment.insert(k.clone(), Value::String(value.clone()));
-                    }
-                }
+            for (k, v) in env_map.0 {
+                environment.insert(k, v.clone());
             }
-            // Convert old secrets to secretRef in environment
-            if let Some(secrets_map) = &manifest.service.secrets.0 {
-                for (secret_name, _) in secrets_map.0.iter() {
-                    environment.insert(
-                        secret_name.clone(),
-                        Value::SecretRef { secret_ref: secret_name.clone() },
-                    );
-                }
-            }
-            DisplayOption(if environment.is_empty() {
-                None
-            } else {
-                Some(DisplayHashMap(environment))
-            })
-        },
+            DisplayHashMap(environment)
+        })),
+        secrets: manifest.service.secrets.clone(),
     };
 
     Ok(ComposeFile {
