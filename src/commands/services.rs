@@ -15,7 +15,7 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::api::types::{DisplayHashMap, DisplayOption, Service, ComposeService, Port};
+use crate::api::types::{DisplayHashMap, DisplayOption, Service, ComposeService, Port, DisplayVec};
 use crate::api::APIClient;
 use difference::{Changeset, Difference};
 use term;
@@ -126,6 +126,7 @@ impl Deploy {
                     .unwrap_or(80),
                 env: compose_service.environment.clone(),
                 secrets: compose_service.secrets.clone(),
+                command: compose_service.command.clone(),
             };
 
             let response = base.api_client().get_service(
@@ -148,6 +149,7 @@ impl Deploy {
                             }],
                             environment: existing_service.env.clone(),
                             secrets: existing_service.secrets.clone(),
+                            command: existing_service.command.clone(),
                         };
 
                         if existing_compose_service == *compose_service {
@@ -341,7 +343,34 @@ impl ComposeBuilder {
                 }],
                 environment: DisplayOption(None),
                 secrets: DisplayOption(None),
+                command: DisplayOption(None),
             };
+
+            // Ask for entrypoint
+            let add_entrypoint = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt("Do you want to specify an entrypoint?")
+                .items(&["no", "yes"])
+                .default(0)
+                .interact()?;
+
+            if add_entrypoint == 1 {
+                let mut entrypoint = Vec::new();
+                loop {
+                    let arg: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                        .with_prompt("Enter entrypoint argument (empty to finish)")
+                        .allow_empty(true)
+                        .interact_text()?;
+
+                    if arg.is_empty() {
+                        break;
+                    }
+
+                    entrypoint.push(arg);
+                }
+                if !entrypoint.is_empty() {
+                    service.command = DisplayOption(Some(DisplayVec(entrypoint)));
+                }
+            }
 
             // Ask for environment variables
             let add_env = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
@@ -641,6 +670,7 @@ fn read_manifest(path: &str) -> Result<ComposeFile> {
             DisplayHashMap(environment)
         })),
         secrets: manifest.service.secrets.clone(),
+        command: manifest.service.command.clone(),
     };
 
     Ok(ComposeFile {

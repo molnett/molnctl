@@ -65,6 +65,8 @@ pub struct Service {
     pub env: DisplayOption<DisplayHashMap<String>>,
     #[serde(default, skip_serializing_if = "is_default")]
     pub secrets: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub command: DisplayOption<DisplayVec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -76,6 +78,8 @@ pub struct ComposeService {
     pub environment: DisplayOption<DisplayHashMap<String>>,
     #[serde(default, skip_serializing_if = "is_default")]
     pub secrets: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub command: DisplayOption<DisplayVec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -112,6 +116,9 @@ pub struct DisplayHashMap<T>(pub IndexMap<String, T>);
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(pub Option<T>);
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct DisplayVec<T>(pub Vec<T>);
+
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
 }
@@ -142,6 +149,17 @@ impl<T: Display> Display for DisplayOption<T> {
         match &self.0 {
             Some(value) => write!(f, "{}", value),
             None => Ok(()),
+        }
+    }
+}
+
+impl<T: Display> Display for DisplayVec<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        if self.0.is_empty() {
+            Ok(())
+        } else {
+            let strings: Vec<String> = self.0.iter().map(|x| x.to_string()).collect();
+            write!(f, "{}", strings.join(" "))
         }
     }
 }
