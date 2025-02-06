@@ -19,8 +19,8 @@ pub struct Orgs {
 }
 
 impl Orgs {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        match &self.command {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        match self.command {
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::Switch(switch)) => switch.execute(base),
@@ -43,7 +43,7 @@ pub enum Commands {
 pub struct List {}
 
 impl List {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let token = base
             .user_config()
             .get_token()
@@ -68,7 +68,7 @@ pub struct Create {
 }
 
 impl Create {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let token = base
             .user_config()
             .get_token()
@@ -169,7 +169,7 @@ pub struct Switch {
 }
 
 impl Switch {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+    pub fn execute(self, mut base: CommandBase) -> Result<()> {
         let orgs = base
             .api_client()
             .get_organizations(base.user_config().get_token().unwrap())?;

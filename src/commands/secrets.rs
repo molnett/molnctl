@@ -20,8 +20,8 @@ pub struct Secrets {
 }
 
 impl Secrets {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        match &self.command {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        match self.command {
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
@@ -52,7 +52,7 @@ pub struct Create {
 }
 
 impl Create {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()
@@ -104,7 +104,7 @@ pub struct List {
 }
 
 impl List {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()
@@ -131,7 +131,7 @@ pub struct Delete {
 }
 
 impl Delete {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()

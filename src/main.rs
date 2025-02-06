@@ -86,17 +86,17 @@ fn main() -> Result<()> {
     }
 
     let mut config = UserConfig::new(&cli);
-    let mut base = CommandBase::new(&mut config, cli.org);
+    let base = CommandBase::new(&mut config, cli.org);
 
     match cli.command {
-        Some(Commands::Auth(auth)) => auth.execute(&mut base),
-        Some(Commands::Environments(environments)) => environments.execute(&mut base),
-        Some(Commands::Deploy(deploy)) => deploy.execute(&base),
-        Some(Commands::Logs(logs)) => logs.execute(&base),
-        Some(Commands::Initialize(init)) => init.execute(&mut base),
-        Some(Commands::Orgs(orgs)) => orgs.execute(&mut base),
-        Some(Commands::Secrets(secrets)) => secrets.execute(&mut base),
-        Some(Commands::Services(svcs)) => svcs.execute(&mut base),
+        Some(Commands::Auth(auth)) => auth.execute(base),
+        Some(Commands::Environments(environments)) => environments.execute(base),
+        Some(Commands::Deploy(deploy)) => deploy.execute(base),
+        Some(Commands::Logs(logs)) => logs.execute(base),
+        Some(Commands::Initialize(init)) => init.execute(base),
+        Some(Commands::Orgs(orgs)) => orgs.execute(base),
+        Some(Commands::Secrets(secrets)) => secrets.execute(base),
+        Some(Commands::Services(svcs)) => svcs.execute(base),
         None => Ok(()),
     }
 }

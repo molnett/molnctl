@@ -40,15 +40,53 @@ pub struct ListServicesResponse {
     pub services: Vec<Service>,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+enum Value {
+    String(String),
+    SecretRef {
+        #[serde(rename = "secretRef")]
+        secret_ref: String,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct EnvironmentValue {
+    pub is_secret: bool,
+    pub value: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Tabled, Clone, PartialEq)]
 pub struct Service {
     pub name: String,
     pub image: String,
     pub container_port: u16,
     #[serde(default, skip_serializing_if = "is_default")]
-    pub env: DisplayOption<DisplayHashMap>,
+    pub env: DisplayOption<DisplayHashMap<String>>,
     #[serde(default, skip_serializing_if = "is_default")]
-    pub secrets: DisplayOption<DisplayHashMap>,
+    pub secrets: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub command: DisplayOption<DisplayVec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ComposeService {
+    pub name: String,
+    pub image: String,
+    pub ports: Vec<Port>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub environment: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub secrets: DisplayOption<DisplayHashMap<String>>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub command: DisplayOption<DisplayVec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Port {
+    pub target: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -73,16 +111,19 @@ pub struct Secret {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct DisplayHashMap(pub IndexMap<String, String>);
+pub struct DisplayHashMap<T>(pub IndexMap<String, T>);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(pub Option<T>);
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct DisplayVec<T>(pub Vec<T>);
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
 }
 
-impl Display for DisplayOption<DisplayHashMap> {
+impl<T: Display> Display for DisplayOption<DisplayHashMap<T>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if self.0.is_none() {
             return Ok(());
@@ -92,7 +133,7 @@ impl Display for DisplayOption<DisplayHashMap> {
         let mut entries = hashmap.0.iter().peekable();
 
         while let Some((key, value)) = entries.next() {
-            write!(f, "{}: {}", key, value)?;
+            write!(f, "{}: {}", key, value.to_string())?;
 
             if entries.peek().is_some() {
                 write!(f, ", ")?;
@@ -108,6 +149,17 @@ impl<T: Display> Display for DisplayOption<T> {
         match &self.0 {
             Some(value) => write!(f, "{}", value),
             None => Ok(()),
+        }
+    }
+}
+
+impl<T: Display> Display for DisplayVec<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        if self.0.is_empty() {
+            Ok(())
+        } else {
+            let strings: Vec<String> = self.0.iter().map(|x| x.to_string()).collect();
+            write!(f, "{}", strings.join(" "))
         }
     }
 }
