@@ -36,8 +36,8 @@ pub struct Services {
 }
 
 impl Services {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        match &self.command {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        match self.command {
             Some(Commands::Deploy(depl)) => depl.execute(base),
             Some(Commands::Initialize(init)) => init.execute(base),
             Some(Commands::ImageName(image_name)) => image_name.execute(base),
@@ -64,8 +64,8 @@ pub enum Commands {
 
 #[derive(Debug, Parser)]
 pub struct Deploy {
-    #[arg(help = "Environment to deploy to")]
-    environment: String,
+    #[arg(long, help = "Environment to deploy to (new compose format only)")]
+    env: Option<String>,
     #[arg(help = "Path to compose or manifest file", default_value("./molnett.yaml"))]
     manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
@@ -79,7 +79,7 @@ pub struct Manifest {
 }
 
 impl Deploy {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()
@@ -87,17 +87,25 @@ impl Deploy {
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let compose = read_manifest(&self.manifest)?;
+        // TODO: remove this once we remove the old manifest format
+        let environment = if let Some(env) = &self.env {
+            env.clone()
+        } else if let Ok(manifest) = serde_yaml::from_str::<Manifest>(&std::fs::read_to_string(&self.manifest)?) {
+            manifest.environment
+        } else {
+            return Err(anyhow!("No environment specified"));
+        };
 
         let env_exists = base
             .api_client()
             .get_environments(token, &org_name)?
             .environments
             .iter()
-            .any(|env| env.name == self.environment);
+            .any(|env| env.name == environment);
         if !env_exists {
             return Err(anyhow!(
                 "Environment {} does not exist",
-                self.environment
+                environment
             ));
         }
 
@@ -123,7 +131,7 @@ impl Deploy {
             let response = base.api_client().get_service(
                 token,
                 &org_name,
-                &self.environment,
+                &environment,
                 &service.name,
             );
 
@@ -162,7 +170,7 @@ impl Deploy {
             let result = base.api_client().deploy_service(
                 token,
                 &org_name,
-                &self.environment,
+                &environment,
                 service,
             )?;
 
@@ -233,7 +241,7 @@ pub struct Initialize {
 }
 
 impl Initialize {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let file_path = Path::new(&self.manifest);
         if file_path.exists() {
             let prompt = format!(
@@ -453,7 +461,7 @@ pub struct ImageName {
 }
 
 impl ImageName {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let token = base
             .user_config()
             .get_token()
@@ -501,7 +509,7 @@ pub struct List {
 }
 
 impl List {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()
@@ -530,7 +538,7 @@ pub struct Delete {
 }
 
 impl Delete {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()
@@ -564,7 +572,7 @@ pub struct Logs {
 }
 
 impl Logs {
-    pub fn execute(&self, base: &CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
         let token = base
             .user_config()

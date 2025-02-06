@@ -30,8 +30,8 @@ pub struct Auth {
 }
 
 impl Auth {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
-        match &self.command {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        match self.command {
             Some(Commands::Login(login)) => login.execute(base),
             Some(Commands::Docker(docker)) => docker.execute(base),
             None => Ok(()),
@@ -52,7 +52,7 @@ pub enum Commands {
 pub struct Login {}
 
 impl Login {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+    pub fn execute(self, mut base: CommandBase) -> Result<()> {
         let server = Server::http("localhost:0").unwrap();
         let local_port = server.server_addr().to_ip().unwrap().port();
         let redirect_uri = format!("http://localhost:{}/oauth2/callback", local_port);
@@ -116,7 +116,7 @@ impl Login {
 pub struct Docker {}
 
 impl Docker {
-    pub fn execute(&self, base: &mut CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
         let token = base.user_config.get_token().ok_or_else(|| {
             anyhow!("Could not get Molnett token. Please run molnctl auth login.")
         })?;
