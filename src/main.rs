@@ -48,6 +48,9 @@ pub struct Cli {
     )]
     org: Option<String>,
 
+    #[arg(global = true, short, help = "Quiet mode, no new version check")]
+    quiet: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -73,13 +76,15 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    let current_version = env!("CARGO_PKG_VERSION");
-    if let Ok(Some(new_version)) = check_newer_release(current_version) {
-        let message = style(format!("A new version ({}) is available at https://github.com/molnett/molnctl - you are running {}\n", new_version, current_version));
-        println!("{}", message.bold().green());
-    }
-
     let cli = Cli::parse();
+
+    if !cli.quiet {
+        let current_version = env!("CARGO_PKG_VERSION");
+        if let Ok(Some(new_version)) = check_newer_release(current_version) {
+            let message = style(format!("A new version ({}) is available at https://github.com/molnett/molnctl - you are running {}\n", new_version, current_version));
+            println!("{}", message.bold().green());
+        }
+    }
 
     if let Some(config_path) = cli.config.as_deref() {
         println!("Config path: {}", config_path);
