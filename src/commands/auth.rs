@@ -128,7 +128,7 @@ impl Docker {
 
         let mut command = Command::new("docker")
             .arg("login")
-            .arg("register.molnett.org")
+            .arg("oci.se-ume.mltt.art")
             .arg("--username=x")
             .arg("--password-stdin")
             .stdin(Stdio::piped())
