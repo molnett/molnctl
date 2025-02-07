@@ -15,7 +15,7 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::api::types::{DisplayHashMap, DisplayOption, Service, ComposeService, Port, DisplayVec};
+use crate::api::types::{ComposeService, DisplayHashMap, DisplayOption, DisplayVec, Port, Service};
 use crate::api::APIClient;
 use difference::{Changeset, Difference};
 use term;
@@ -66,7 +66,10 @@ pub enum Commands {
 pub struct Deploy {
     #[arg(long, help = "Environment to deploy to (new compose format only)")]
     env: Option<String>,
-    #[arg(help = "Path to compose or manifest file", default_value("./molnett.yaml"))]
+    #[arg(
+        help = "Path to compose or manifest file",
+        default_value("./molnett.yaml")
+    )]
     manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
@@ -90,7 +93,9 @@ impl Deploy {
         // TODO: remove this once we remove the old manifest format
         let environment = if let Some(env) = &self.env {
             env.clone()
-        } else if let Ok(manifest) = serde_yaml::from_str::<Manifest>(&std::fs::read_to_string(&self.manifest)?) {
+        } else if let Ok(manifest) =
+            serde_yaml::from_str::<Manifest>(&std::fs::read_to_string(&self.manifest)?)
+        {
             manifest.environment
         } else {
             return Err(anyhow!("No environment specified"));
@@ -103,10 +108,7 @@ impl Deploy {
             .iter()
             .any(|env| env.name == environment);
         if !env_exists {
-            return Err(anyhow!(
-                "Environment {} does not exist",
-                environment
-            ));
+            return Err(anyhow!("Environment {} does not exist", environment));
         }
 
         if compose.services.is_empty() {
@@ -121,7 +123,9 @@ impl Deploy {
             let service = Service {
                 name: service_name.clone(),
                 image: compose_service.image.clone(),
-                container_port: compose_service.ports.first()
+                container_port: compose_service
+                    .ports
+                    .first()
                     .map(|p| p.target)
                     .unwrap_or(80),
                 env: compose_service.environment.clone(),
@@ -129,12 +133,9 @@ impl Deploy {
                 command: compose_service.command.clone(),
             };
 
-            let response = base.api_client().get_service(
-                token,
-                &org_name,
-                &environment,
-                &service.name,
-            );
+            let response =
+                base.api_client()
+                    .get_service(token, &org_name, &environment, &service.name);
 
             if let Some(false) = self.no_confirm {
                 let existing_svc_yaml = match response? {
@@ -169,12 +170,9 @@ impl Deploy {
                 }
             }
 
-            let result = base.api_client().deploy_service(
-                token,
-                &org_name,
-                &environment,
-                service,
-            )?;
+            let result =
+                base.api_client()
+                    .deploy_service(token, &org_name, &environment, service)?;
 
             println!("Service {} deployed: {:?}", service_name, result);
         }
@@ -284,7 +282,6 @@ struct ComposeFile {
     services: Vec<ComposeService>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 enum Value {
@@ -322,13 +319,15 @@ impl ComposeBuilder {
 
         for i in 0..num_services {
             println!("\nConfiguring service {} of {}", i + 1, num_services);
-            let service_name: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt("Please enter a name for your service")
-                .interact_text()?;
+            let service_name: String =
+                Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                    .with_prompt("Please enter a name for your service")
+                    .interact_text()?;
 
-            let container_port: u16 = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt("Please enter the port your container is listening on")
-                .interact_text()?;
+            let container_port: u16 =
+                Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                    .with_prompt("Please enter the port your container is listening on")
+                    .interact_text()?;
 
             let image_name = get_image_name(&self.api_client, &self.token, &self.org_name, &None)?;
             let image_tag = get_image_tag(&None)?;
@@ -347,19 +346,21 @@ impl ComposeBuilder {
             };
 
             // Ask for entrypoint
-            let add_entrypoint = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt("Do you want to specify an entrypoint?")
-                .items(&["no", "yes"])
-                .default(0)
-                .interact()?;
+            let add_entrypoint =
+                FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                    .with_prompt("Do you want to specify an entrypoint?")
+                    .items(&["no", "yes"])
+                    .default(0)
+                    .interact()?;
 
             if add_entrypoint == 1 {
                 let mut entrypoint = Vec::new();
                 loop {
-                    let arg: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                        .with_prompt("Enter entrypoint argument (empty to finish)")
-                        .allow_empty(true)
-                        .interact_text()?;
+                    let arg: String =
+                        Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                            .with_prompt("Enter entrypoint argument (empty to finish)")
+                            .allow_empty(true)
+                            .interact_text()?;
 
                     if arg.is_empty() {
                         break;
@@ -382,30 +383,34 @@ impl ComposeBuilder {
             if add_env == 1 {
                 let mut environment = IndexMap::new();
                 loop {
-                    let key: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                        .with_prompt("Enter environment variable name (empty to finish)")
-                        .allow_empty(true)
-                        .interact_text()?;
+                    let key: String =
+                        Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                            .with_prompt("Enter environment variable name (empty to finish)")
+                            .allow_empty(true)
+                            .interact_text()?;
 
                     if key.is_empty() {
                         break;
                     }
 
-                    let is_secret = FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                        .with_prompt("Is this a secret reference?")
-                        .items(&["no", "yes"])
-                        .default(0)
-                        .interact()?;
+                    let is_secret =
+                        FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                            .with_prompt("Is this a secret reference?")
+                            .items(&["no", "yes"])
+                            .default(0)
+                            .interact()?;
 
                     let value = if is_secret == 1 {
-                        let secret_name: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Enter secret name")
-                            .interact_text()?;
+                        let secret_name: String =
+                            Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                                .with_prompt("Enter secret name")
+                                .interact_text()?;
                         secret_name
                     } else {
-                        let value: String = Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                            .with_prompt("Enter environment variable value")
-                            .interact_text()?;
+                        let value: String =
+                            Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                                .with_prompt("Enter environment variable value")
+                                .interact_text()?;
                         value
                     };
 
@@ -446,11 +451,7 @@ fn get_image_name(
     };
     let org_id = api_client.get_org(token, org_name)?.id;
 
-    Ok(format!(
-        "register.molnett.org/{}/{}",
-        org_id,
-        image_name
-    ))
+    Ok(format!("oci.se-ume.mltt.art/{}/{}", org_id, image_name))
 }
 
 fn get_image_tag(tag: &Option<String>) -> Result<String> {
@@ -462,18 +463,14 @@ fn get_image_tag(tag: &Option<String>) -> Result<String> {
             .arg("--short")
             .arg("HEAD")
             .output()?;
-        Ok(String::from_utf8_lossy(&git_output.stdout).trim().to_string())
+        Ok(String::from_utf8_lossy(&git_output.stdout)
+            .trim()
+            .to_string())
     }
 }
 
 #[derive(Parser, Debug)]
-#[command(
-    author,
-    version,
-    about,
-    long_about,
-    arg_required_else_help = true,
-)]
+#[command(author, version, about, long_about, arg_required_else_help = true)]
 pub struct ImageName {
     #[arg(help = "If updating a compose file, the service name to update")]
     service: Option<String>,
@@ -510,15 +507,20 @@ impl ImageName {
                 Some(service_name) => {
                     // Handle compose file format
                     let mut compose = read_manifest(&path)?;
-                    let service = compose.services.iter_mut()
+                    let service = compose
+                        .services
+                        .iter_mut()
                         .find(|s| s.name == *service_name)
-                        .ok_or_else(|| anyhow!("Service {} not found in compose file", service_name))?;
+                        .ok_or_else(|| {
+                            anyhow!("Service {} not found in compose file", service_name)
+                        })?;
                     service.image = full_image.clone();
                     write_manifest(&path, &compose)?;
                 }
                 None => {
                     // Handle old manifest format
-                    let mut manifest: Manifest = serde_yaml::from_str(&std::fs::read_to_string(&path)?)?;
+                    let mut manifest: Manifest =
+                        serde_yaml::from_str(&std::fs::read_to_string(&path)?)?;
                     manifest.service.image = full_image.clone();
                     let mut file = File::create(&path)?;
                     serde_yaml::to_writer(&mut file, &manifest)?;
@@ -596,7 +598,10 @@ impl Delete {
 pub struct Logs {
     #[arg(help = "Environment to get logs from")]
     environment: String,
-    #[arg(help = "Path to compose or manifest file", default_value("./compose.yaml"))]
+    #[arg(
+        help = "Path to compose or manifest file",
+        default_value("./compose.yaml")
+    )]
     manifest: String,
 }
 
@@ -609,7 +614,9 @@ impl Logs {
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let compose = read_manifest(&self.manifest)?;
-        let service = compose.services.first()
+        let service = compose
+            .services
+            .first()
             .ok_or_else(|| anyhow!("No services found in compose file"))?;
 
         let logurl: Uri = url::Url::parse(
