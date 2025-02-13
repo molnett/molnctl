@@ -1,7 +1,7 @@
 use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use dialoguer::{FuzzySelect, Input};
+use dialoguer::FuzzySelect;
 use std::io::{self, BufRead};
 use tabled::Table;
 
@@ -62,9 +62,9 @@ impl Create {
         let value: String = if let Some(true) = self.stdin {
             self.read_stdin()?
         } else {
-            Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
+            dialoguer::Password::with_theme(&dialoguer::theme::ColorfulTheme::default())
                 .with_prompt("Secret value:")
-                .interact_text()
+                .interact()
                 .expect("Failed to get user input")
         };
 
