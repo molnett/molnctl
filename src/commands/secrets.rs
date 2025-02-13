@@ -1,7 +1,7 @@
 use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use dialoguer::{FuzzySelect, Input};
+use dialoguer::FuzzySelect;
 use std::io::{self, BufRead};
 use tabled::Table;
 
