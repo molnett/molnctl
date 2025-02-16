@@ -1,7 +1,6 @@
 use camino::Utf8PathBuf;
 use config::Config;
 
-
 use crate::Cli;
 
 use super::{default_user_config_path, write_to_disk_json, Error};
@@ -22,7 +21,7 @@ pub struct UserConfigInner {
 }
 
 fn default_url() -> String {
-    "https://api.molnett.org".to_string()
+    "https://api.se-ume.molnett.app".to_string()
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -42,8 +41,7 @@ impl Token {
     }
 }
 
-pub struct UserConfigLoader {
-}
+pub struct UserConfigLoader {}
 
 impl UserConfig {
     pub fn new(cli: &Cli) -> Self {

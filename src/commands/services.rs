@@ -451,7 +451,7 @@ fn get_image_name(
     };
     let org_id = api_client.get_org(token, org_name)?.id;
 
-    Ok(format!("register.molnett.org/{}/{}", org_id, image_name))
+    Ok(format!("oci.se-ume.mltt.art/{}/{}", org_id, image_name))
 }
 
 fn get_image_tag(tag: &Option<String>) -> Result<String> {
