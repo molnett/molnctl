@@ -36,7 +36,7 @@ pub struct Cli {
         global = true,
         long,
         env("MOLNETT_API_URL"),
-        help = "Url of the Molnett API, default is https://api.molnett.org"
+        help = "Url of the Molnett API, default is https://api.se-ume.molnett.app"
     )]
     url: Option<String>,
 
