@@ -17,8 +17,13 @@ use tungstenite::ClientRequestBuilder;
 
 use crate::api::types::{ComposeService, DisplayHashMap, DisplayOption, DisplayVec, Port, Service};
 use crate::api::APIClient;
+use crate::config::user::UserConfig;
 use difference::{Changeset, Difference};
 use term;
+
+fn is_hidden() -> bool {
+    UserConfig::get_permissions().contains(&"superadmin".to_string())
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -28,7 +33,8 @@ use term;
     long_about,
     subcommand_required = true,
     arg_required_else_help = true,
-    visible_alias = "svcs"
+    visible_alias = "svcs",
+    hide = is_hidden(),
 )]
 pub struct Services {
     #[command(subcommand)]
@@ -64,10 +70,10 @@ pub enum Commands {
 
 #[derive(Debug, Parser)]
 pub struct Deploy {
-    #[arg(long, help = "Environment to deploy to (new compose format only)")]
-    env: Option<String>,
+    #[arg(long, help = "Environment to deploy to")]
+    env: String,
     #[arg(
-        help = "Path to compose or manifest file",
+        help = "Path to compose file",
         default_value("./molnett.yaml")
     )]
     manifest: String,
@@ -75,38 +81,27 @@ pub struct Deploy {
     no_confirm: Option<bool>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
-pub struct Manifest {
-    environment: String,
-    service: Service,
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct ComposeFile {
+    version: u16,
+    services: Vec<ComposeService>,
 }
 
 impl Deploy {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let compose = read_manifest(&self.manifest)?;
-        // TODO: remove this once we remove the old manifest format
-        let environment = if let Some(env) = &self.env {
-            env.clone()
-        } else if let Ok(manifest) =
-            serde_yaml::from_str::<Manifest>(&std::fs::read_to_string(&self.manifest)?)
-        {
-            manifest.environment
-        } else {
-            return Err(anyhow!("No environment specified"));
-        };
+        let environment = &self.env;
 
         let env_exists = base
             .api_client()
-            .get_environments(token, &org_name)?
+            .get_environments(&token, &org_name)?
             .environments
             .iter()
-            .any(|env| env.name == environment);
+            .any(|env| env.name == *environment);
+
         if !env_exists {
             return Err(anyhow!("Environment {} does not exist", environment));
         }
@@ -135,7 +130,7 @@ impl Deploy {
 
             let response =
                 base.api_client()
-                    .get_service(token, &org_name, &environment, &service.name);
+                    .get_service(&token, &org_name, &environment, &service.name);
 
             if let Some(false) = self.no_confirm {
                 let existing_svc_yaml = match response? {
@@ -172,7 +167,7 @@ impl Deploy {
 
             let result =
                 base.api_client()
-                    .deploy_service(token, &org_name, &environment, service)?;
+                    .deploy_service(&token, &org_name, &environment, service)?;
 
             println!("Service {} deployed: {:?}", service_name, result);
         }
@@ -260,12 +255,9 @@ impl Initialize {
             }
         }
 
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
-        let compose = ComposeBuilder::new(token.to_string(), base.api_client(), base.get_org()?)
+        let compose = ComposeBuilder::new(token, base.api_client(), base.get_org()?)
             .add_services()?
             .build();
 
@@ -274,12 +266,6 @@ impl Initialize {
         println!("Wrote manifest to {}...", &self.manifest);
         Ok(())
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct ComposeFile {
-    version: u16,
-    services: Vec<ComposeService>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -488,14 +474,11 @@ pub struct ImageName {
 
 impl ImageName {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let image_name = get_image_name(
             &base.api_client(),
-            token,
+            &token,
             &base.get_org()?,
             &self.image_name,
         )?;
@@ -503,29 +486,19 @@ impl ImageName {
         let full_image = format!("{}:{}", image_name, image_tag);
 
         if let Some(path) = self.update_manifest.clone() {
-            match &self.service {
-                Some(service_name) => {
-                    // Handle compose file format
-                    let mut compose = read_manifest(&path)?;
-                    let service = compose
-                        .services
-                        .iter_mut()
-                        .find(|s| s.name == *service_name)
-                        .ok_or_else(|| {
-                            anyhow!("Service {} not found in compose file", service_name)
-                        })?;
-                    service.image = full_image.clone();
-                    write_manifest(&path, &compose)?;
-                }
-                None => {
-                    // Handle old manifest format
-                    let mut manifest: Manifest =
-                        serde_yaml::from_str(&std::fs::read_to_string(&path)?)?;
-                    manifest.service.image = full_image.clone();
-                    let mut file = File::create(&path)?;
-                    serde_yaml::to_writer(&mut file, &manifest)?;
-                }
-            }
+            let service_name = self.service.as_ref().ok_or_else(|| {
+                anyhow!("Service name is required when updating a compose file")
+            })?;
+            let mut compose = read_manifest(&path)?;
+            let service = compose
+                .services
+                .iter_mut()
+                .find(|s| s.name == *service_name)
+                .ok_or_else(|| {
+                    anyhow!("Service {} not found in compose file", service_name)
+                })?;
+            service.image = full_image.clone();
+            write_manifest(&path, &compose)?;
         }
 
         println!("{}", full_image);
@@ -542,14 +515,11 @@ pub struct List {
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let response = base
             .api_client()
-            .get_services(token, &org_name, &self.env)?;
+            .get_services(&token, &org_name, &self.env)?;
 
         let table = Table::new(response.services).to_string();
         println!("{}", table);
@@ -571,10 +541,7 @@ pub struct Delete {
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         if let Some(false) = self.no_confirm {
             let prompt = format!("Org: {}, Environment: {}, Service: {}. Are you sure you want to delete this service?", org_name, self.env, self.name);
@@ -587,7 +554,7 @@ impl Delete {
         }
 
         base.api_client()
-            .delete_service(token, &org_name, &self.env, &self.name)?;
+            .delete_service(&token, &org_name, &self.env, &self.name)?;
 
         println!("Service {} deleted", self.name);
         Ok(())
@@ -608,10 +575,7 @@ pub struct Logs {
 impl Logs {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let compose = read_manifest(&self.manifest)?;
         let service = compose
@@ -622,7 +586,7 @@ impl Logs {
         let logurl: Uri = url::Url::parse(
             format!(
                 "{}/orgs/{}/envs/{}/svcs/{}/logs",
-                base.user_config().get_url().replace("http", "ws"),
+                UserConfig::get_url().replace("http", "ws"),
                 org_name,
                 self.environment,
                 service.name,
@@ -649,41 +613,7 @@ impl Logs {
 fn read_manifest(path: &str) -> Result<ComposeFile> {
     let mut file_content = String::new();
     File::open(&path)?.read_to_string(&mut file_content)?;
-
-    // Try to parse as new compose format first
-    match serde_yaml::from_str::<ComposeFile>(&file_content) {
-        Ok(compose) => return Ok(compose),
-        Err(e) => println!("Failed to parse as compose file: {}", e),
-    }
-
-    println!("Trying old manifest format");
-    // If not a compose file, try to parse as our old manifest format
-    let manifest: Manifest = serde_yaml::from_str(&file_content)
-        .map_err(|e| anyhow!("Failed to parse manifest: {}", e))?;
-
-    // Convert old manifest to new compose format
-    let service = ComposeService {
-        name: manifest.service.name,
-        image: manifest.service.image,
-        ports: vec![Port {
-            target: manifest.service.container_port,
-            published: None,
-        }],
-        environment: DisplayOption(manifest.service.env.0.map(|env_map| {
-            let mut environment = IndexMap::new();
-            for (k, v) in env_map.0 {
-                environment.insert(k, v.clone());
-            }
-            DisplayHashMap(environment)
-        })),
-        secrets: manifest.service.secrets.clone(),
-        command: manifest.service.command.clone(),
-    };
-
-    Ok(ComposeFile {
-        version: 2,
-        services: vec![service],
-    })
+    serde_yaml::from_str(&file_content).map_err(|e| anyhow!("Failed to parse compose file: {}", e))
 }
 
 fn write_manifest(path: &str, compose: &ComposeFile) -> Result<()> {

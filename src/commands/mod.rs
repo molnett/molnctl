@@ -10,42 +10,34 @@ pub mod environments;
 pub mod orgs;
 pub mod secrets;
 pub mod services;
+pub mod projects;
 
-pub struct CommandBase<'a> {
-    user_config: &'a mut UserConfig,
+pub struct CommandBase {
     org_arg: Option<String>,
 }
 
-impl CommandBase<'_> {
-    pub fn new(user_config: &mut UserConfig, org_arg: Option<String>) -> CommandBase {
+impl CommandBase {
+    pub fn new(org_arg: Option<String>) -> CommandBase {
         CommandBase {
-            user_config,
             org_arg,
         }
     }
 
     pub fn api_client(&self) -> APIClient {
-        let url = self.user_config.get_url();
-        APIClient::new(url)
+        APIClient::new(&UserConfig::get_url())
     }
 
-    pub fn user_config(&self) -> &UserConfig {
-        self.user_config
-    }
-
-    pub fn user_config_mut(&mut self) -> &mut UserConfig {
-        self.user_config
+    pub fn get_token(&self) -> Result<String> {
+        UserConfig::get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))
     }
 
     pub fn get_org(&self) -> Result<String> {
-        let org_name = if self.org_arg.is_some() {
-            self.org_arg.clone().unwrap()
-        } else {
-            match self.user_config.get_default_org() {
-                Some(cfg) => cfg.to_string(),
-                None => return Err(anyhow!("Either set a default org in the config or provide one via --org"))
-            }
-        };
-        Ok(org_name)
+        if let Some(org) = &self.org_arg {
+            return Ok(org.clone());
+        }
+
+        UserConfig::get_default_org()
+            .ok_or_else(|| anyhow!("Either set a default org in the config or provide one via --org"))
     }
 }

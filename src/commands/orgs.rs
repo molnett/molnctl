@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use tabled::Table;
 
+use crate::config::user::UserConfig;
 use super::CommandBase;
 
 #[derive(Parser, Debug)]
@@ -44,12 +45,8 @@ pub struct List {}
 
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
-
-        let response = base.api_client().get_organizations(token)?;
+        let token = base.get_token()?;
+        let response = base.api_client().get_organizations(&token)?;
 
         let table = Table::new(response.organizations).to_string();
         println!("{}", table);
@@ -69,18 +66,14 @@ pub struct Create {
 
 impl Create {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
-
+        let token = base.get_token()?;
         let plan = CreatePlan::builder()
             .name(self.name.as_deref())
             .billing_email(self.billing_email.as_deref())
             .build()?;
 
         let response = base.api_client().create_organization(
-            token,
+            &token,
             plan.name.as_str(),
             plan.billing_email.as_str(),
         )?;
@@ -169,10 +162,11 @@ pub struct Switch {
 }
 
 impl Switch {
-    pub fn execute(self, mut base: CommandBase) -> Result<()> {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        let token = base.get_token()?;
         let orgs = base
             .api_client()
-            .get_organizations(base.user_config().get_token().unwrap())?;
+            .get_organizations(&token)?;
         let org_names = orgs
             .organizations
             .iter()
@@ -198,7 +192,7 @@ impl Switch {
             org_names[selection].to_string()
         };
 
-        match base.user_config_mut().write_default_org(org_name) {
+        match UserConfig::set_default_org(org_name) {
             Ok(_) => Ok(()),
             Err(err) => {
                 println!("Error while writing config: {}", err);

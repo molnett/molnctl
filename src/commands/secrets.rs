@@ -1,5 +1,5 @@
 use super::CommandBase;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use dialoguer::{FuzzySelect, Input};
 use std::io::{self, BufRead};
@@ -54,10 +54,7 @@ pub struct Create {
 impl Create {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let value: String = if let Some(true) = self.stdin {
             self.read_stdin()?
@@ -69,7 +66,7 @@ impl Create {
         };
 
         base.api_client()
-            .create_secret(token, &org_name, &self.env, &self.name, &value)?;
+            .create_secret(&token, &org_name, &self.env, &self.name, &value)?;
 
         println!("Secret {} created", &self.name);
         Ok(())
@@ -106,12 +103,9 @@ pub struct List {
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
-        let response = base.api_client().get_secrets(token, &org_name, &self.env)?;
+        let response = base.api_client().get_secrets(&token, &org_name, &self.env)?;
 
         let table = Table::new(response.secrets).to_string();
         println!("{}", table);
@@ -133,10 +127,7 @@ pub struct Delete {
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         if let Some(false) = self.no_confirm {
             let prompt = format!("Org: {}, Environment: {}, Secret: {}. Are you sure you want to delete this secret?", org_name, self.env, self.name);
@@ -149,7 +140,7 @@ impl Delete {
         }
 
         base.api_client()
-            .delete_secret(token, &org_name, &self.env, &self.name)?;
+            .delete_secret(&token, &org_name, &self.env, &self.name)?;
 
         println!("Secret {} deleted", self.name);
         Ok(())

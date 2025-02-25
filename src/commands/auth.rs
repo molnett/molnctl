@@ -11,9 +11,7 @@ use oauth2::{
 };
 use tiny_http::{Response, Server};
 
-use crate::config::user::Token;
-
-use super::CommandBase;
+use crate::config::user::{Token, UserConfig};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -30,10 +28,10 @@ pub struct Auth {
 }
 
 impl Auth {
-    pub fn execute(self, base: CommandBase) -> Result<()> {
+    pub fn execute(self) -> Result<()> {
         match self.command {
-            Some(Commands::Login(login)) => login.execute(base),
-            Some(Commands::Docker(docker)) => docker.execute(base),
+            Some(Commands::Login(login)) => login.execute(),
+            Some(Commands::Docker(docker)) => docker.execute(),
             None => Ok(()),
         }
     }
@@ -52,12 +50,12 @@ pub enum Commands {
 pub struct Login {}
 
 impl Login {
-    pub fn execute(self, mut base: CommandBase) -> Result<()> {
+    pub fn execute(self) -> Result<()> {
         let server = Server::http("localhost:0").unwrap();
         let local_port = server.server_addr().to_ip().unwrap().port();
         let redirect_uri = format!("http://localhost:{}/oauth2/callback", local_port);
 
-        let url = base.user_config().get_url();
+        let url = UserConfig::get_url();
         let client = BasicClient::new(
             ClientId::new("124a489e-93f7-4dd6-abae-1ed4c692bdc7".to_string()),
             None,
@@ -104,7 +102,7 @@ impl Login {
             token.expiry = Some(Utc::now() + chrono::Duration::hours(1));
         }
 
-        base.user_config_mut().write_token(token)?;
+        UserConfig::set_token(token)?;
 
         request.respond(Response::from_string("Success! You can close this tab now"))?;
 
@@ -116,12 +114,11 @@ impl Login {
 pub struct Docker {}
 
 impl Docker {
-    pub fn execute(self, base: CommandBase) -> Result<()> {
-        let token = base.user_config.get_token().ok_or_else(|| {
-            anyhow!("Could not get Molnett token. Please run molnctl auth login.")
-        })?;
+    pub fn execute(self) -> Result<()> {
+        let token = UserConfig::get_token()
+            .ok_or_else(|| anyhow!("Could not get Molnett token. Please run molnctl auth login."))?;
 
-        if base.user_config.is_token_expired() {
+        if UserConfig::is_token_expired() {
             println!("Token expired. Please run molnctl auth login.");
             return Ok(());
         }

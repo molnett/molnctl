@@ -1,5 +1,5 @@
 use super::CommandBase;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use dialoguer::FuzzySelect;
 use tabled::Table;
@@ -54,13 +54,10 @@ pub struct Create {
 impl Create {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         let response = base.api_client().create_environment(
-            token,
+            &token,
             &self.name,
             &org_name,
             self.copy_from.as_deref(),
@@ -79,12 +76,9 @@ pub struct List {}
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
-        let response = base.api_client().get_environments(token, &org_name)?;
+        let response = base.api_client().get_environments(&token, &org_name)?;
 
         let table = Table::new(response.environments).to_string();
         println!("{}", table);
@@ -104,10 +98,7 @@ pub struct Delete {
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let org_name = base.get_org()?;
-        let token = base
-            .user_config()
-            .get_token()
-            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+        let token = base.get_token()?;
 
         if !self.confirm_deletion(&org_name)? {
             println!("Delete cancelled");
@@ -115,7 +106,7 @@ impl Delete {
         }
 
         base.api_client()
-            .delete_environment(token, &org_name, &self.name)?;
+            .delete_environment(&token, &org_name, &self.name)?;
 
         println!("Environment {} deleted", self.name);
         Ok(())

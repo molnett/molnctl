@@ -1,6 +1,5 @@
 use crate::config::user::UserConfig;
 use anyhow::{anyhow, Result};
-use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use commands::CommandBase;
 use dialoguer::console::style;
@@ -22,16 +21,6 @@ mod config;
     arg_required_else_help = true
 )]
 pub struct Cli {
-    #[arg(
-        global = true,
-        short,
-        long,
-        value_name = "FILE",
-        env("MOLNETT_CONFIG"),
-        help = "config file, default is $HOME/.config/molnett/config.json"
-    )]
-    config: Option<Utf8PathBuf>,
-
     #[arg(
         global = true,
         long,
@@ -73,9 +62,15 @@ enum Commands {
     Secrets(commands::secrets::Secrets),
     /// Deploy and manage services
     Services(commands::services::Services),
+    /// Create and manage projects
+    Projects(commands::projects::Projects),
 }
 
 fn main() -> Result<()> {
+    // First phase: Load config from disk before parsing CLI args
+    // so we can use it to determine if we should hide commands
+    UserConfig::load_from_disk()?;
+
     let cli = Cli::parse();
 
     if !cli.quiet {
@@ -86,15 +81,13 @@ fn main() -> Result<()> {
         }
     }
 
-    if let Some(config_path) = cli.config.as_deref() {
-        println!("Config path: {}", config_path);
-    }
+    // Second phase: Apply CLI options
+    UserConfig::apply_cli_options(&cli);
 
-    let mut config = UserConfig::new(&cli);
-    let base = CommandBase::new(&mut config, cli.org);
+    let base = CommandBase::new(cli.org);
 
     match cli.command {
-        Some(Commands::Auth(auth)) => auth.execute(base),
+        Some(Commands::Auth(auth)) => auth.execute(),
         Some(Commands::Environments(environments)) => environments.execute(base),
         Some(Commands::Deploy(deploy)) => deploy.execute(base),
         Some(Commands::Logs(logs)) => logs.execute(base),
@@ -102,6 +95,7 @@ fn main() -> Result<()> {
         Some(Commands::Orgs(orgs)) => orgs.execute(base),
         Some(Commands::Secrets(secrets)) => secrets.execute(base),
         Some(Commands::Services(svcs)) => svcs.execute(base),
+        Some(Commands::Projects(projects)) => projects.execute(),
         None => Ok(()),
     }
 }
