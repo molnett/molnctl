@@ -1,26 +1,30 @@
 use anyhow::{anyhow, Result};
 
-use crate::{
-    api::APIClient,
-    config::user::UserConfig,
-};
+use crate::{api::APIClient, config::user::UserConfig};
 
 pub mod auth;
 pub mod environments;
-pub mod orgs;
+pub mod projects;
 pub mod secrets;
 pub mod services;
+pub mod tenants;
 
 pub struct CommandBase<'a> {
     user_config: &'a mut UserConfig,
-    org_arg: Option<String>,
+    tenant_arg: Option<String>,
+    project_arg: Option<String>,
 }
 
 impl CommandBase<'_> {
-    pub fn new(user_config: &mut UserConfig, org_arg: Option<String>) -> CommandBase {
+    pub fn new(
+        user_config: &mut UserConfig,
+        tenant_arg: Option<String>,
+        project_arg: Option<String>,
+    ) -> CommandBase {
         CommandBase {
             user_config,
-            org_arg,
+            tenant_arg,
+            project_arg,
         }
     }
 
@@ -37,15 +41,35 @@ impl CommandBase<'_> {
         self.user_config
     }
 
-    pub fn get_org(&self) -> Result<String> {
-        let org_name = if self.org_arg.is_some() {
-            self.org_arg.clone().unwrap()
+    pub fn get_tenant(&self) -> Result<String> {
+        let tenant_name = if self.tenant_arg.is_some() {
+            self.tenant_arg.clone().unwrap()
         } else {
-            match self.user_config.get_default_org() {
+            match self.user_config.get_default_tenant() {
                 Some(cfg) => cfg.to_string(),
-                None => return Err(anyhow!("Either set a default org in the config or provide one via --org"))
+                None => {
+                    return Err(anyhow!(
+                        "Either switch to a tenant with `molnctl tenant switch` or provide one via --tenant"
+                    ))
+                }
             }
         };
-        Ok(org_name)
+        Ok(tenant_name)
+    }
+
+    pub fn get_project(&self) -> Result<String> {
+        let project_name = if self.project_arg.is_some() {
+            self.project_arg.clone().unwrap()
+        } else {
+            match self.user_config.get_default_project() {
+                Some(cfg) => cfg.to_string(),
+                None => {
+                    return Err(anyhow!(
+                        "Either switch to a project with `molnctl project switch` or provide one via --project"
+                    ))
+                }
+            }
+        };
+        Ok(project_name)
     }
 }

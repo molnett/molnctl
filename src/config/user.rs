@@ -15,7 +15,8 @@ pub struct UserConfig {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct UserConfigInner {
     token: Option<Token>,
-    default_org: Option<String>,
+    default_tenant: Option<String>,
+    default_project: Option<String>,
     #[serde(default = "default_url")]
     url: String,
 }
@@ -59,6 +60,12 @@ impl UserConfig {
             config.set_url(h.to_string());
         }
 
+        if config.config.url == "https://api.molnett.org" {
+            config.config.url = default_url();
+            write_to_disk_json(&config_path, &config.config)
+                .expect("Failed to write config to disk");
+        }
+
         config
     }
     pub fn get_token(&self) -> Option<&str> {
@@ -78,13 +85,21 @@ impl UserConfig {
 
         write_to_disk_json(&self.path, &self.disk_config)
     }
-    pub fn write_default_org(&mut self, org_name: String) -> Result<(), super::Error> {
-        self.disk_config.default_org = Some(org_name.clone());
-        self.config.default_org = Some(org_name);
+    pub fn write_default_tenant(&mut self, tenant_name: String) -> Result<(), super::Error> {
+        self.disk_config.default_tenant = Some(tenant_name.clone());
+        self.config.default_tenant = Some(tenant_name);
         write_to_disk_json(&self.path, &self.disk_config)
     }
-    pub fn get_default_org(&self) -> Option<&str> {
-        self.config.default_org.as_deref()
+    pub fn get_default_tenant(&self) -> Option<&str> {
+        self.config.default_tenant.as_deref()
+    }
+    pub fn get_default_project(&self) -> Option<&str> {
+        self.config.default_project.as_deref()
+    }
+    pub fn write_default_project(&mut self, project_name: String) -> Result<(), super::Error> {
+        self.disk_config.default_project = Some(project_name.clone());
+        self.config.default_project = Some(project_name);
+        write_to_disk_json(&self.path, &self.disk_config)
     }
     pub fn get_url(&self) -> &str {
         self.config.url.as_ref()

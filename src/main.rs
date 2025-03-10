@@ -43,10 +43,18 @@ pub struct Cli {
     #[arg(
         global = true,
         long,
-        env("MOLNETT_ORG"),
-        help = "Organization to use (overrides default in config)"
+        env("MOLNETT_TENANT"),
+        help = "Tenant to use (overrides default in config)"
     )]
-    org: Option<String>,
+    tenant: Option<String>,
+
+    #[arg(
+        global = true,
+        long,
+        env("MOLNETT_PROJECT"),
+        help = "Project to use (overrides default in config)"
+    )]
+    project: Option<String>,
 
     #[arg(global = true, short, help = "Quiet mode, no new version check")]
     quiet: bool,
@@ -67,8 +75,10 @@ enum Commands {
     Logs(commands::services::Logs),
     /// Generate Dockerfile and Molnett manifest
     Initialize(commands::services::Initialize),
-    /// Manage organizations
-    Orgs(commands::orgs::Orgs),
+    /// Manage tenants
+    Tenants(commands::tenants::Tenants),
+    /// Create and manage projects
+    Projects(commands::projects::Projects),
     /// Create and manage secrets
     Secrets(commands::secrets::Secrets),
     /// Deploy and manage services
@@ -91,7 +101,7 @@ fn main() -> Result<()> {
     }
 
     let mut config = UserConfig::new(&cli);
-    let base = CommandBase::new(&mut config, cli.org);
+    let base = CommandBase::new(&mut config, cli.tenant, cli.project);
 
     match cli.command {
         Some(Commands::Auth(auth)) => auth.execute(base),
@@ -99,7 +109,8 @@ fn main() -> Result<()> {
         Some(Commands::Deploy(deploy)) => deploy.execute(base),
         Some(Commands::Logs(logs)) => logs.execute(base),
         Some(Commands::Initialize(init)) => init.execute(base),
-        Some(Commands::Orgs(orgs)) => orgs.execute(base),
+        Some(Commands::Tenants(tenants)) => tenants.execute(base),
+        Some(Commands::Projects(projects)) => projects.execute(base),
         Some(Commands::Secrets(secrets)) => secrets.execute(base),
         Some(Commands::Services(svcs)) => svcs.execute(base),
         None => Ok(()),

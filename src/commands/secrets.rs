@@ -53,7 +53,8 @@ pub struct Create {
 
 impl Create {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
@@ -68,8 +69,14 @@ impl Create {
                 .expect("Failed to get user input")
         };
 
-        base.api_client()
-            .create_secret(token, &org_name, &self.env, &self.name, &value)?;
+        base.api_client().create_secret(
+            token,
+            &tenant_name,
+            &project_name,
+            &self.env,
+            &self.name,
+            &value,
+        )?;
 
         println!("Secret {} created", &self.name);
         Ok(())
@@ -105,13 +112,16 @@ pub struct List {
 
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().get_secrets(token, &org_name, &self.env)?;
+        let response =
+            base.api_client()
+                .get_secrets(token, &tenant_name, &project_name, &self.env)?;
 
         let table = Table::new(response.secrets).to_string();
         println!("{}", table);
@@ -132,14 +142,18 @@ pub struct Delete {
 
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         if let Some(false) = self.no_confirm {
-            let prompt = format!("Org: {}, Environment: {}, Secret: {}. Are you sure you want to delete this secret?", org_name, self.env, self.name);
+            let prompt = format!(
+                "Tenant: {}, Project: {}, Environment: {}, Secret: {}. Are you sure you want to delete this secret?",
+                tenant_name, project_name, self.env, self.name
+            );
             FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
                 .with_prompt(prompt)
                 .items(&["no", "yes"])
@@ -148,8 +162,13 @@ impl Delete {
                 .unwrap();
         }
 
-        base.api_client()
-            .delete_secret(token, &org_name, &self.env, &self.name)?;
+        base.api_client().delete_secret(
+            token,
+            &tenant_name,
+            &project_name,
+            &self.env,
+            &self.name,
+        )?;
 
         println!("Secret {} deleted", self.name);
         Ok(())

@@ -1,8 +1,9 @@
-use super::CommandBase;
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dialoguer::FuzzySelect;
 use tabled::Table;
+
+use crate::commands::CommandBase;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -12,19 +13,20 @@ use tabled::Table;
     long_about,
     subcommand_required = true,
     arg_required_else_help = true,
-    visible_alias = "envs"
+    visible_alias = "proj"
 )]
-pub struct Environments {
+pub struct Projects {
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
-impl Environments {
+impl Projects {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         match self.command {
             Some(Commands::Create(create)) => create.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
+            Some(Commands::Switch(switch)) => switch.execute(base),
             None => Ok(()),
         }
     }
@@ -32,44 +34,38 @@ impl Environments {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Create an environment
-    #[command(arg_required_else_help = true)]
+    /// Create a project
     Create(Create),
-    /// List environments
-    #[command()]
+    /// List projects   
     List(List),
-    /// Delete an environment
+    /// Delete a project
     Delete(Delete),
+    /// Switch to a project
+    Switch(Switch),
 }
 
 #[derive(Debug, Parser)]
 pub struct Create {
-    #[arg(help = "Name of the environment to create")]
+    #[arg(help = "Name of the project to create")]
     name: String,
-
-    #[arg(long, help = "Copy from an existing environment", num_args(0..=1), require_equals(true), value_name = "ENV_NAME",)]
-    copy_from: Option<String>,
 }
 
 impl Create {
-    pub fn execute(self, base: CommandBase) -> Result<()> {
+    pub fn execute(self, mut base: CommandBase) -> Result<()> {
         let tenant_name = base.get_tenant()?;
-        let project_name = base.get_project()?;
+
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base.api_client().create_environment(
-            token,
-            &self.name,
-            &tenant_name,
-            &project_name,
-            self.copy_from.as_deref(),
-        )?;
+        let response = base
+            .api_client()
+            .create_project(token, &tenant_name, &self.name)?;
+        println!("Project created: {}", response.name);
 
-        let table = Table::new([response]).to_string();
-        println!("{}", table);
+        base.user_config_mut()
+            .write_default_project(self.name.clone())?;
 
         Ok(())
     }
@@ -81,17 +77,15 @@ pub struct List {}
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let tenant_name = base.get_tenant()?;
-        let project_name = base.get_project()?;
+
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base
-            .api_client()
-            .get_environments(token, &tenant_name, &project_name)?;
+        let response = base.api_client().get_projects(token, &tenant_name)?;
 
-        let table = Table::new(response.environments).to_string();
+        let table = Table::new(response.projects).to_string();
         println!("{}", table);
 
         Ok(())
@@ -100,8 +94,9 @@ impl List {
 
 #[derive(Debug, Parser)]
 pub struct Delete {
-    #[arg(help = "Name of the environment")]
+    #[arg(help = "Name of the project to delete")]
     name: String,
+
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
 }
@@ -109,21 +104,20 @@ pub struct Delete {
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
         let tenant_name = base.get_tenant()?;
-        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        if !self.confirm_deletion(&tenant_name, &project_name)? {
+        if !self.confirm_deletion(&tenant_name, &self.name)? {
             println!("Delete cancelled");
             return Ok(());
         }
 
         base.api_client()
-            .delete_environment(token, &tenant_name, &project_name, &self.name)?;
+            .delete_project(token, &tenant_name, &self.name)?;
 
-        println!("Environment {} deleted", self.name);
+        println!("Project deleted: {}", self.name);
         Ok(())
     }
 
@@ -145,5 +139,44 @@ impl Delete {
             .interact()?;
 
         Ok(options[selected] == "yes")
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct Switch {
+    #[arg(help = "Name of the project to switch to")]
+    name: Option<String>,
+}
+
+impl Switch {
+    pub fn execute(self, mut base: CommandBase) -> Result<()> {
+        let response = base.api_client().get_projects(
+            base.user_config().get_token().unwrap(),
+            base.get_tenant()?.as_str(),
+        )?;
+        let projects = response.projects;
+
+        let project_name = match self.name {
+            Some(name) => {
+                if !projects.iter().any(|p| p.name == name) {
+                    return Err(anyhow!("Project {} not found", name));
+                }
+                name
+            }
+            None => {
+                let selection =
+                    FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                        .with_prompt("Please select your project: ")
+                        .items(&projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>())
+                        .interact()
+                        .unwrap();
+                projects[selection].name.clone()
+            }
+        };
+
+        base.user_config_mut()
+            .write_default_project(project_name.clone())?;
+        println!("Switched to project: {}", project_name);
+        Ok(())
     }
 }
