@@ -21,41 +21,187 @@ impl APIClient {
         }
     }
 
-    pub fn get_org(&self, token: &str, org_name: &str) -> anyhow::Result<Organization> {
-        let url = format!("{}/orgs/{}", self.base_url, org_name);
-        let response = self.get(&url, token)?;
+    pub fn get_tenants(&self, token: &str) -> Result<ListTenantsResponse, reqwest::Error> {
+        let url = format!("{}/tenants", self.base_url);
+        let response = self.get(&url, token)?.error_for_status()?;
+        response.json()
+    }
+
+    pub fn get_projects(
+        &self,
+        token: &str,
+        tenant_name: &str,
+    ) -> Result<ListProjectsResponse, reqwest::Error> {
+        let url = format!("{}/tenants/{}/projects", self.base_url, tenant_name);
+        let response = self.get(&url, token)?.error_for_status()?;
+        response.json()
+    }
+
+    pub fn get_project(
+        &self,
+        token: &str,
+        tenant_name: &str,
+        project_name: &str,
+    ) -> anyhow::Result<Project> {
+        let url = format!(
+            "{}/tenants/{}/projects/{}",
+            self.base_url, tenant_name, project_name
+        );
+        let response = self.get(&url, token)?.error_for_status()?;
         match response.status() {
             StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
-                .with_context(|| "Failed to deserialize org")?),
+                .with_context(|| "Failed to deserialize project")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Project does not exist")),
             _ => Err(anyhow!(
-                "Failed to get org. API returned {} {}",
+                "Failed to get project. API returned {} {}",
                 response.status(),
                 response.text()?
             )),
         }
     }
 
-    pub fn get_organizations(
+    pub fn create_project(
         &self,
         token: &str,
-    ) -> Result<ListOrganizationResponse, reqwest::Error> {
-        let url = format!("{}/orgs", self.base_url);
-        let response = self.get(&url, token)?.error_for_status()?;
-        response.json()
+        tenant_name: &str,
+        name: &str,
+    ) -> anyhow::Result<Project> {
+        let url = format!("{}/tenants/{}/projects", self.base_url, tenant_name);
+        let mut body = HashMap::new();
+        body.insert("name", name);
+        let response = self.post(&url, token, &body)?;
+        match response.status() {
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize project")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Project already exists")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Tenant does not exist")),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            _ => Err(anyhow!(
+                "Failed to create project. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
+    pub fn delete_project(
+        &self,
+        token: &str,
+        tenant_name: &str,
+        project_name: &str,
+    ) -> anyhow::Result<()> {
+        let url = format!(
+            "{}/tenants/{}/projects/{}",
+            self.base_url, tenant_name, project_name
+        );
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Project does not exist")),
+            _ => Err(anyhow!(
+                "Failed to delete project. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
+    pub fn get_environments(
+        &self,
+        token: &str,
+        tenant_name: &str,
+        project_name: &str,
+    ) -> anyhow::Result<ListEnvironmentsResponse> {
+        let url = format!(
+            "{}/tenants/{}/projects/{}/environments",
+            self.base_url, tenant_name, project_name
+        );
+        let response = self.get(&url, token)?;
+        match response.status() {
+            StatusCode::OK => {
+                let text = &response.text()?;
+                Ok(serde_json::from_str(text)
+                    .with_context(|| "Failed to deserialize environments")?)
+            }
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Project does not exist")),
+            _ => Err(anyhow!(
+                "Failed to get environments. API returned {} {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
+    pub fn create_environment(
+        &self,
+        token: &str,
+        name: &str,
+        tenant_name: &str,
+        project_name: &str,
+        copy_from: Option<&str>,
+    ) -> anyhow::Result<CreateEnvironmentResponse> {
+        let url = format!(
+            "{}/tenants/{}/projects/{}/environments",
+            self.base_url, tenant_name, project_name
+        );
+        let mut body = HashMap::new();
+        body.insert("name", name);
+        if let Some(copy_from) = copy_from {
+            body.insert("copy_from", copy_from);
+        }
+        let response = self.post(&url, token, &body)?;
+        match response.status() {
+            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
+                .with_context(|| "Failed to deserialize env")?),
+            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
+            StatusCode::CONFLICT => Err(anyhow!("Environment already exists")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Project does not exist")),
+            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
+            _ => Err(anyhow!(
+                "Failed to create environment. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
+        }
+    }
+
+    pub fn delete_environment(
+        &self,
+        token: &str,
+        tenant_name: &str,
+        project_name: &str,
+        name: &str,
+    ) -> anyhow::Result<()> {
+        let url = format!(
+            "{}/tenants/{}/projects/{}/environments/{}",
+            self.base_url, tenant_name, project_name, name
+        );
+        let response = self.delete(&url, token)?;
+        match response.status() {
+            StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::NOT_FOUND => Err(anyhow!("Environment does not exist")),
+            _ => Err(anyhow!(
+                "Failed to delete environment. API returned {} - {}",
+                response.status(),
+                response.text()?
+            )),
+        }
     }
 
     pub fn get_service(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
         name: &str,
     ) -> anyhow::Result<Option<Service>> {
         let url = format!(
-            "{}/orgs/{}/envs/{}/svcs/{}",
-            self.base_url, org_name, env_name, name
+            "{}/tenants/{}/projects/{}/environments/{}/services/{}",
+            self.base_url, tenant_name, project_name, env_name, name
         );
         let response = self.get(&url, token)?;
         match response.status() {
@@ -74,119 +220,30 @@ impl APIClient {
     pub fn get_services(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
     ) -> anyhow::Result<ListServicesResponse> {
-        let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
+        let url = format!(
+            "{}/tenants/{}/projects/{}/environments/{}/services",
+            self.base_url, tenant_name, project_name, env_name
+        );
         let response: String = self.get(&url, token)?.error_for_status()?.text()?;
         serde_json::from_str(response.as_str()).with_context(|| "Failed to deserialize response")
-    }
-
-    pub fn create_organization(
-        &self,
-        token: &str,
-        name: &str,
-        billing_email: &str,
-    ) -> anyhow::Result<Organization> {
-        let url = format!("{}/orgs", self.base_url);
-        let mut body = HashMap::new();
-        body.insert("name", name);
-        body.insert("billing_email", billing_email);
-        let response = self.post(&url, token, &body)?;
-        match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
-                .with_context(|| "Failed to deserialize org")?),
-            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::CONFLICT => Err(anyhow!("Organization already exists")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
-            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!(
-                "Failed to deploy service. API returned {} - {}",
-                response.status(),
-                response.text()?
-            )),
-        }
-    }
-
-    pub fn get_environments(
-        &self,
-        token: &str,
-        org_name: &str,
-    ) -> anyhow::Result<ListEnvironmentsResponse> {
-        let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-        let response = self.get(&url, token)?;
-        match response.status() {
-            StatusCode::OK => {
-                let text = &response.text()?;
-                Ok(serde_json::from_str(text)
-                    .with_context(|| "Failed to deserialize environments")?)
-            }
-            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Organization does not exist")),
-            _ => Err(anyhow!(
-                "Failed to get environments. API returned {} {}",
-                response.status(),
-                response.text()?
-            )),
-        }
-    }
-
-    pub fn create_environment(
-        &self,
-        token: &str,
-        name: &str,
-        org_name: &str,
-        copy_from: Option<&str>,
-    ) -> anyhow::Result<CreateEnvironmentResponse> {
-        let url = format!("{}/orgs/{}/envs", self.base_url, org_name);
-        let mut body = HashMap::new();
-        body.insert("name", name);
-        if let Some(copy_from) = copy_from {
-            body.insert("copy_from", copy_from);
-        }
-        let response = self.post(&url, token, &body)?;
-        match response.status() {
-            StatusCode::CREATED => Ok(serde_json::from_str(&response.text()?)
-                .with_context(|| "Failed to deserialize env")?),
-            StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::CONFLICT => Err(anyhow!("Environment already exists")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Org not found")),
-            StatusCode::BAD_REQUEST => Err(anyhow!("Bad request: {}", response.text()?)),
-            _ => Err(anyhow!(
-                "Failed to create environment. API returned {} - {}",
-                response.status(),
-                response.text()?
-            )),
-        }
-    }
-
-    pub fn delete_environment(
-        &self,
-        token: &str,
-        org_name: &str,
-        name: &str,
-    ) -> anyhow::Result<()> {
-        let url = format!("{}/orgs/{}/envs/{}", self.base_url, org_name, name);
-        let response = self.delete(&url, token)?;
-        match response.status() {
-            StatusCode::NO_CONTENT => Ok(()),
-            StatusCode::NOT_FOUND => Err(anyhow!("Environment does not exist")),
-            _ => Err(anyhow!(
-                "Failed to delete environment. API returned {} - {}",
-                response.status(),
-                response.text()?
-            )),
-        }
     }
 
     pub fn deploy_service(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
         service: Service,
     ) -> anyhow::Result<DeployServiceResponse> {
-        let url = format!("{}/orgs/{}/envs/{}/svcs", self.base_url, org_name, env_name);
+        let url = format!(
+            "{}/tenants/{}/projects/{}/environments/{}/services",
+            self.base_url, tenant_name, project_name, env_name
+        );
         let body = serde_json::to_string(&service)?;
         let response = self.post_str(&url, token, body)?;
         let status = response.status();
@@ -209,13 +266,14 @@ impl APIClient {
     pub fn delete_service(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
         svc_name: &str,
     ) -> anyhow::Result<()> {
         let url = format!(
-            "{}/orgs/{}/envs/{}/svcs/{}",
-            self.base_url, org_name, env_name, svc_name
+            "{}/tenants/{}/projects/{}/environments/{}/services/{}",
+            self.base_url, tenant_name, project_name, env_name, svc_name
         );
         let response = self.delete(&url, token)?;
         match response.status() {
@@ -232,19 +290,20 @@ impl APIClient {
     pub fn get_secrets(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
     ) -> anyhow::Result<ListSecretsResponse> {
         let url = format!(
-            "{}/orgs/{}/envs/{}/secrets",
-            self.base_url, org_name, env_name
+            "{}/tenants/{}/projects/{}/environments/{}/secrets",
+            self.base_url, tenant_name, project_name, env_name
         );
         let response = self.get(&url, token)?;
         match response.status() {
             StatusCode::OK => Ok(serde_json::from_str(&response.text()?)
                 .with_context(|| "Failed to deserialize secrets list")?),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Tenant or project does not exist")),
             _ => Err(anyhow!(
                 "Failed to get secrets. API returned {} - {}",
                 response.status(),
@@ -256,14 +315,15 @@ impl APIClient {
     pub fn create_secret(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
         name: &str,
         value: &str,
     ) -> anyhow::Result<()> {
         let url = format!(
-            "{}/orgs/{}/envs/{}/secrets/{}",
-            self.base_url, org_name, env_name, name
+            "{}/tenants/{}/projects/{}/environments/{}/secrets/{}",
+            self.base_url, tenant_name, project_name, env_name, name
         );
         let mut body = HashMap::new();
         body.insert("value", value);
@@ -271,7 +331,7 @@ impl APIClient {
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
             StatusCode::UNAUTHORIZED => Err(anyhow!("Unauthorized, please login first")),
-            StatusCode::NOT_FOUND => Err(anyhow!("Org or environment not found")),
+            StatusCode::NOT_FOUND => Err(anyhow!("Tenant or project does not exist")),
             _ => Err(anyhow!(
                 "Failed to create secret. API returned {} - {}",
                 response.status(),
@@ -283,13 +343,14 @@ impl APIClient {
     pub fn delete_secret(
         &self,
         token: &str,
-        org_name: &str,
+        tenant_name: &str,
+        project_name: &str,
         env_name: &str,
         secret_name: &str,
     ) -> anyhow::Result<()> {
         let url = format!(
-            "{}/orgs/{}/envs/{}/secrets/{}",
-            self.base_url, org_name, env_name, secret_name
+            "{}/tenants/{}/projects/{}/environments/{}/secrets/{}",
+            self.base_url, tenant_name, project_name, env_name, secret_name
         );
         let response = self.delete(&url, token)?;
         match response.status() {

@@ -5,21 +5,48 @@ use tabled::Tabled;
 use time::OffsetDateTime;
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
-pub struct Organization {
+pub struct Tenant {
     pub id: String,
     pub name: String,
     pub billing_email: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ListOrganizationResponse {
-    pub organizations: Vec<Organization>,
+pub struct ListTenantsResponse {
+    pub tenants: Vec<Tenant>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub tenant_id: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ListProjectsResponse {
+    pub projects: Vec<Project>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
+pub struct CreateProjectRequest {
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Tabled)]
+pub struct CreateProjectResponse {
+    pub id: String,
+    pub name: String,
+    pub tenant_id: String,
+    pub created_at: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Tabled)]
 pub struct Environment {
+    pub id: String,
     pub name: String,
-    pub organization_id: String,
+    pub project_id: String,
     pub created_at: String,
 }
 
@@ -133,7 +160,7 @@ impl<T: Display> Display for DisplayOption<DisplayHashMap<T>> {
         let mut entries = hashmap.0.iter().peekable();
 
         while let Some((key, value)) = entries.next() {
-            write!(f, "{}: {}", key, value.to_string())?;
+            write!(f, "{}: {}", key, value)?;
 
             if entries.peek().is_some() {
                 write!(f, ", ")?;

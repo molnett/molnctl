@@ -83,7 +83,8 @@ pub struct Manifest {
 
 impl Deploy {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
@@ -103,7 +104,7 @@ impl Deploy {
 
         let env_exists = base
             .api_client()
-            .get_environments(token, &org_name)?
+            .get_environments(token, &tenant_name, &project_name)?
             .environments
             .iter()
             .any(|env| env.name == environment);
@@ -133,9 +134,13 @@ impl Deploy {
                 command: compose_service.command.clone(),
             };
 
-            let response =
-                base.api_client()
-                    .get_service(token, &org_name, &environment, &service.name);
+            let response = base.api_client().get_service(
+                token,
+                &tenant_name,
+                &project_name,
+                &environment,
+                &service.name,
+            );
 
             if let Some(false) = self.no_confirm {
                 let existing_svc_yaml = match response? {
@@ -170,9 +175,13 @@ impl Deploy {
                 }
             }
 
-            let result =
-                base.api_client()
-                    .deploy_service(token, &org_name, &environment, service)?;
+            let result = base.api_client().deploy_service(
+                token,
+                &tenant_name,
+                &project_name,
+                &environment,
+                service,
+            )?;
 
             println!("Service {} deployed: {:?}", service_name, result);
         }
@@ -265,9 +274,14 @@ impl Initialize {
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let compose = ComposeBuilder::new(token.to_string(), base.api_client(), base.get_org()?)
-            .add_services()?
-            .build();
+        let compose = ComposeBuilder::new(
+            token.to_string(),
+            base.api_client(),
+            base.get_tenant()?,
+            base.get_project()?,
+        )
+        .add_services()?
+        .build();
 
         write_manifest(&self.manifest, &compose)?;
 
@@ -295,16 +309,23 @@ enum Value {
 struct ComposeBuilder {
     token: String,
     api_client: APIClient,
-    org_name: String,
+    tenant_name: String,
+    project_name: String,
     compose: ComposeFile,
 }
 
 impl ComposeBuilder {
-    pub fn new(token: String, api_client: APIClient, org_name: String) -> Self {
+    pub fn new(
+        token: String,
+        api_client: APIClient,
+        tenant_name: String,
+        project_name: String,
+    ) -> Self {
         ComposeBuilder {
             token,
             api_client,
-            org_name,
+            tenant_name,
+            project_name,
             compose: ComposeFile {
                 version: 2,
                 services: Vec::new(),
@@ -329,7 +350,13 @@ impl ComposeBuilder {
                     .with_prompt("Please enter the port your container is listening on")
                     .interact_text()?;
 
-            let image_name = get_image_name(&self.api_client, &self.token, &self.org_name, &None)?;
+            let image_name = get_image_name(
+                &self.api_client,
+                &self.token,
+                &self.tenant_name,
+                &self.project_name,
+                &None,
+            )?;
             let image_tag = get_image_tag(&None)?;
             let full_image = format!("{}:{}", image_name, image_tag);
 
@@ -435,7 +462,8 @@ impl ComposeBuilder {
 fn get_image_name(
     api_client: &APIClient,
     token: &str,
-    org_name: &str,
+    tenant_name: &str,
+    project_name: &str,
     name: &Option<String>,
 ) -> Result<String> {
     let image_name = if let Some(name) = name {
@@ -449,9 +477,9 @@ fn get_image_name(
         };
         image_name.to_string()
     };
-    let org_id = api_client.get_org(token, org_name)?.id;
+    let project_id = api_client.get_project(token, tenant_name, project_name)?.id;
 
-    Ok(format!("oci.se-ume.mltt.art/{}/{}", org_id, image_name))
+    Ok(format!("oci.se-ume.mltt.art/{}/{}", project_id, image_name))
 }
 
 fn get_image_tag(tag: &Option<String>) -> Result<String> {
@@ -496,7 +524,8 @@ impl ImageName {
         let image_name = get_image_name(
             &base.api_client(),
             token,
-            &base.get_org()?,
+            &base.get_tenant()?,
+            &base.get_project()?,
             &self.image_name,
         )?;
         let image_tag = get_image_tag(&self.tag)?;
@@ -541,15 +570,16 @@ pub struct List {
 
 impl List {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
-        let response = base
-            .api_client()
-            .get_services(token, &org_name, &self.env)?;
+        let response =
+            base.api_client()
+                .get_services(token, &tenant_name, &project_name, &self.env)?;
 
         let table = Table::new(response.services).to_string();
         println!("{}", table);
@@ -570,14 +600,18 @@ pub struct Delete {
 
 impl Delete {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         if let Some(false) = self.no_confirm {
-            let prompt = format!("Org: {}, Environment: {}, Service: {}. Are you sure you want to delete this service?", org_name, self.env, self.name);
+            let prompt = format!(
+                "Tenant: {}, Project: {}, Environment: {}, Service: {}. Are you sure you want to delete this service?",
+                tenant_name, project_name, self.env, self.name
+            );
             FuzzySelect::with_theme(&dialoguer::theme::ColorfulTheme::default())
                 .with_prompt(prompt)
                 .items(&["no", "yes"])
@@ -586,8 +620,13 @@ impl Delete {
                 .unwrap();
         }
 
-        base.api_client()
-            .delete_service(token, &org_name, &self.env, &self.name)?;
+        base.api_client().delete_service(
+            token,
+            &tenant_name,
+            &project_name,
+            &self.env,
+            &self.name,
+        )?;
 
         println!("Service {} deleted", self.name);
         Ok(())
@@ -607,7 +646,8 @@ pub struct Logs {
 
 impl Logs {
     pub fn execute(self, base: CommandBase) -> Result<()> {
-        let org_name = base.get_org()?;
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
         let token = base
             .user_config()
             .get_token()
@@ -621,9 +661,10 @@ impl Logs {
 
         let logurl: Uri = url::Url::parse(
             format!(
-                "{}/orgs/{}/envs/{}/svcs/{}/logs",
+                "{}/tenants/{}/projects/{}/environments/{}/services/{}/logs",
                 base.user_config().get_url().replace("http", "ws"),
-                org_name,
+                tenant_name,
+                project_name,
                 self.environment,
                 service.name,
             )
@@ -648,7 +689,7 @@ impl Logs {
 
 fn read_manifest(path: &str) -> Result<ComposeFile> {
     let mut file_content = String::new();
-    File::open(&path)?.read_to_string(&mut file_content)?;
+    File::open(path)?.read_to_string(&mut file_content)?;
 
     // Try to parse as new compose format first
     match serde_yaml::from_str::<ComposeFile>(&file_content) {
