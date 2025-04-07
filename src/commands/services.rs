@@ -15,7 +15,8 @@ use tungstenite::connect;
 use tungstenite::http::Uri;
 use tungstenite::ClientRequestBuilder;
 
-use crate::api::types::{ComposeService, DisplayHashMap, DisplayOption, DisplayVec, Port, Service};
+use crate::api::types::NonComposeManifest;
+use crate::api::types::{ComposeService, Container, DisplayVec, Port};
 use crate::api::APIClient;
 use difference::{Changeset, Difference};
 use term;
@@ -64,21 +65,12 @@ pub enum Commands {
 
 #[derive(Debug, Parser)]
 pub struct Deploy {
-    #[arg(long, help = "Environment to deploy to (new compose format only)")]
+    #[arg(long, help = "Environment to deploy to")]
     env: Option<String>,
-    #[arg(
-        help = "Path to compose or manifest file",
-        default_value("./molnett.yaml")
-    )]
+    #[arg(help = "Path to molnett file", default_value("./molnett.yaml"))]
     manifest: String,
     #[arg(long, help = "Skip confirmation", default_missing_value("true"), default_value("false"), num_args(0..=1), require_equals(true))]
     no_confirm: Option<bool>,
-}
-
-#[derive(Deserialize, Debug, Serialize)]
-pub struct Manifest {
-    environment: String,
-    service: Service,
 }
 
 impl Deploy {
@@ -91,13 +83,8 @@ impl Deploy {
             .ok_or_else(|| anyhow!("No token found. Please login first."))?;
 
         let compose = read_manifest(&self.manifest)?;
-        // TODO: remove this once we remove the old manifest format
         let environment = if let Some(env) = &self.env {
             env.clone()
-        } else if let Ok(manifest) =
-            serde_yaml::from_str::<Manifest>(&std::fs::read_to_string(&self.manifest)?)
-        {
-            manifest.environment
         } else {
             return Err(anyhow!("No environment specified"));
         };
@@ -120,52 +107,26 @@ impl Deploy {
             let service_name = &compose_service.name;
             println!("\nDeploying service: {}", service_name);
 
-            // Convert compose service to our service type
-            let service = Service {
-                name: service_name.clone(),
-                image: compose_service.image.clone(),
-                container_port: compose_service
-                    .ports
-                    .first()
-                    .map(|p| p.target)
-                    .unwrap_or(80),
-                env: compose_service.environment.clone(),
-                secrets: compose_service.secrets.clone(),
-                command: compose_service.command.clone(),
-            };
-
             let response = base.api_client().get_service(
                 token,
                 &tenant_name,
                 &project_name,
                 &environment,
-                &service.name,
+                service_name,
             );
 
             if let Some(false) = self.no_confirm {
                 let existing_svc_yaml = match response? {
                     Some(existing_service) => {
-                        // Convert existing service to ComposeService for comparison
-                        let existing_compose_service = ComposeService {
-                            name: existing_service.name,
-                            image: existing_service.image,
-                            ports: vec![Port {
-                                target: existing_service.container_port,
-                                published: None,
-                            }],
-                            environment: existing_service.env.clone(),
-                            secrets: existing_service.secrets.clone(),
-                            command: existing_service.command.clone(),
-                        };
-
-                        if existing_compose_service == *compose_service {
+                        if existing_service == *compose_service {
                             println!("No changes detected for service {}", service_name);
                             continue;
                         }
-                        serde_yaml::to_string(&existing_compose_service)?
+                        serde_yaml::to_string(&existing_service)?
                     }
                     None => String::new(),
                 };
+
                 let new_svc_yaml = serde_yaml::to_string(compose_service)?;
                 self.render_diff(existing_svc_yaml, new_svc_yaml)?;
                 let selection = self.user_confirmation();
@@ -180,7 +141,7 @@ impl Deploy {
                 &tenant_name,
                 &project_name,
                 &environment,
-                service,
+                compose_service,
             )?;
 
             println!("Service {} deployed: {:?}", service_name, result);
@@ -199,7 +160,19 @@ impl Deploy {
     }
 
     fn render_diff(&self, a: String, b: String) -> Result<()> {
-        let Changeset { diffs, .. } = Changeset::new(&a, &b, "\n");
+        // Parse YAML strings into Value objects
+        let a_value: serde_yaml::Value = serde_yaml::from_str(&a)?;
+        let b_value: serde_yaml::Value = serde_yaml::from_str(&b)?;
+
+        // Sort all maps by keys recursively
+        let sorted_a = Deploy::sort_yaml_maps(a_value);
+        let sorted_b = Deploy::sort_yaml_maps(b_value);
+
+        // Re-serialize with sorted maps
+        let normalized_a = serde_yaml::to_string(&sorted_a)?;
+        let normalized_b = serde_yaml::to_string(&sorted_b)?;
+
+        let Changeset { diffs, .. } = Changeset::new(&normalized_a, &normalized_b, "\n");
         let mut t = match term::stdout() {
             Some(stdout) => stdout,
             None => {
@@ -227,6 +200,40 @@ impl Deploy {
         t.reset().unwrap();
         t.flush().unwrap();
         Ok(())
+    }
+
+    // Recursively sort all maps in a YAML value by their keys
+    fn sort_yaml_maps(value: serde_yaml::Value) -> serde_yaml::Value {
+        match value {
+            serde_yaml::Value::Mapping(mapping) => {
+                let mut sorted_map = serde_yaml::Mapping::new();
+
+                // Get all keys, sort them
+                let mut keys: Vec<serde_yaml::Value> = mapping.keys().cloned().collect();
+                keys.sort_by(|a, b| {
+                    let a_str = a.as_str().unwrap_or("");
+                    let b_str = b.as_str().unwrap_or("");
+                    a_str.cmp(b_str)
+                });
+
+                // Reconstruct the map with sorted keys
+                for key in keys {
+                    if let Some(val) = mapping.get(&key) {
+                        // Apply sorting recursively to the value
+                        sorted_map.insert(key, Deploy::sort_yaml_maps(val.clone()));
+                    }
+                }
+
+                serde_yaml::Value::Mapping(sorted_map)
+            }
+            serde_yaml::Value::Sequence(seq) => {
+                // Apply sorting recursively to each element in the sequence
+                let sorted_seq = seq.into_iter().map(Deploy::sort_yaml_maps).collect();
+                serde_yaml::Value::Sequence(sorted_seq)
+            }
+            // Other value types (strings, numbers, etc) are returned as-is
+            _ => value,
+        }
     }
 }
 
@@ -360,16 +367,19 @@ impl ComposeBuilder {
             let image_tag = get_image_tag(&None)?;
             let full_image = format!("{}:{}", image_name, image_tag);
 
-            let mut service = ComposeService {
-                name: service_name,
+            let container_name = format!("{}-main", service_name);
+            let mut container = Container {
+                name: container_name,
                 image: full_image,
+                container_type: String::new(),
+                shared_volume_path: String::new(),
                 ports: vec![Port {
                     target: container_port,
-                    published: None,
+                    publish: Some(true),
                 }],
-                environment: DisplayOption(None),
-                secrets: DisplayOption(None),
-                command: DisplayOption(None),
+                environment: IndexMap::new(),
+                secrets: IndexMap::new(),
+                command: Vec::new(),
             };
 
             // Ask for entrypoint
@@ -396,7 +406,7 @@ impl ComposeBuilder {
                     entrypoint.push(arg);
                 }
                 if !entrypoint.is_empty() {
-                    service.command = DisplayOption(Some(DisplayVec(entrypoint)));
+                    container.command = entrypoint;
                 }
             }
 
@@ -432,7 +442,8 @@ impl ComposeBuilder {
                             Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
                                 .with_prompt("Enter secret name")
                                 .interact_text()?;
-                        secret_name
+                        container.secrets.insert(key.clone(), secret_name);
+                        continue;
                     } else {
                         let value: String =
                             Input::with_theme(&dialoguer::theme::ColorfulTheme::default())
@@ -444,9 +455,14 @@ impl ComposeBuilder {
                     environment.insert(key, value);
                 }
                 if !environment.is_empty() {
-                    service.environment = DisplayOption(Some(DisplayHashMap(environment)));
+                    container.environment = environment;
                 }
             }
+
+            let service = ComposeService {
+                name: service_name,
+                containers: DisplayVec(vec![container]),
+            };
 
             self.compose.services.push(service);
         }
@@ -500,15 +516,11 @@ fn get_image_tag(tag: &Option<String>) -> Result<String> {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about, arg_required_else_help = true)]
 pub struct ImageName {
-    #[arg(help = "If updating a compose file, the service name to update")]
-    service: Option<String>,
+    #[arg(help = "The service name to update")]
+    service: String,
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
-    #[arg(
-        short,
-        long,
-        help = "Path to a manifest file. Can be either a compose file (with service provided) or a molnett manifest"
-    )]
+    #[arg(short, long, help = "Path to a manifest file.")]
     update_manifest: Option<String>,
     #[arg(short, long, help = "Override image name. Default is directory name")]
     image_name: Option<String>,
@@ -532,29 +544,31 @@ impl ImageName {
         let full_image = format!("{}:{}", image_name, image_tag);
 
         if let Some(path) = self.update_manifest.clone() {
-            match &self.service {
-                Some(service_name) => {
-                    // Handle compose file format
-                    let mut compose = read_manifest(&path)?;
-                    let service = compose
-                        .services
-                        .iter_mut()
-                        .find(|s| s.name == *service_name)
-                        .ok_or_else(|| {
-                            anyhow!("Service {} not found in compose file", service_name)
-                        })?;
-                    service.image = full_image.clone();
-                    write_manifest(&path, &compose)?;
-                }
-                None => {
-                    // Handle old manifest format
-                    let mut manifest: Manifest =
-                        serde_yaml::from_str(&std::fs::read_to_string(&path)?)?;
-                    manifest.service.image = full_image.clone();
-                    let mut file = File::create(&path)?;
-                    serde_yaml::to_writer(&mut file, &manifest)?;
-                }
+            // Handle compose file format
+            let mut compose = read_manifest(&path)?;
+            let service = compose
+                .services
+                .iter_mut()
+                .find(|s| s.name == self.service)
+                .ok_or_else(|| anyhow!("Service {} not found in compose file", &self.service))?;
+
+            // Update the image in the first container or create one if none exists
+            if let Some(container) = service.containers.0.first_mut() {
+                container.image = full_image.clone();
+            } else {
+                service.containers.0.push(Container {
+                    name: format!("{}-main", &self.service),
+                    image: full_image.clone(),
+                    container_type: String::new(),
+                    shared_volume_path: String::new(),
+                    ports: Vec::new(),
+                    environment: IndexMap::new(),
+                    secrets: IndexMap::new(),
+                    command: Vec::new(),
+                });
             }
+
+            write_manifest(&path, &compose)?;
         }
 
         println!("{}", full_image);
@@ -637,10 +651,7 @@ impl Delete {
 pub struct Logs {
     #[arg(help = "Environment to get logs from")]
     environment: String,
-    #[arg(
-        help = "Path to compose or manifest file",
-        default_value("./compose.yaml")
-    )]
+    #[arg(help = "Path to manifest file", default_value("./molnett.yaml"))]
     manifest: String,
 }
 
@@ -691,40 +702,42 @@ fn read_manifest(path: &str) -> Result<ComposeFile> {
     let mut file_content = String::new();
     File::open(path)?.read_to_string(&mut file_content)?;
 
-    // Try to parse as new compose format first
-    match serde_yaml::from_str::<ComposeFile>(&file_content) {
-        Ok(compose) => return Ok(compose),
-        Err(e) => println!("Failed to parse as compose file: {}", e),
+    // Try first to check if this is a hybrid format (has version but old service format)
+    if file_content.contains("version:") && !file_content.contains("containers:") {
+        println!("Detected non-containers format, converting to new compose format");
+
+        // Try to parse as hybrid format
+        if let Ok(hybrid) = serde_yaml::from_str::<NonComposeManifest>(&file_content) {
+            let mut new_services = Vec::new();
+
+            for old_service in hybrid.services {
+                let mut container = old_service.clone();
+                container.name = "main".to_string();
+                container.ports[0].publish = Some(true);
+                container.container_type = "main".to_string();
+
+                let new_service = ComposeService {
+                    name: old_service.name,
+                    containers: DisplayVec(vec![container]),
+                };
+
+                new_services.push(new_service);
+            }
+
+            return Ok(ComposeFile {
+                version: hybrid.version,
+                services: new_services,
+            });
+        } else {
+            return Err(anyhow!("Failed to parse manifest"));
+        }
     }
 
-    println!("Trying old manifest format");
-    // If not a compose file, try to parse as our old manifest format
-    let manifest: Manifest = serde_yaml::from_str(&file_content)
-        .map_err(|e| anyhow!("Failed to parse manifest: {}", e))?;
-
-    // Convert old manifest to new compose format
-    let service = ComposeService {
-        name: manifest.service.name,
-        image: manifest.service.image,
-        ports: vec![Port {
-            target: manifest.service.container_port,
-            published: None,
-        }],
-        environment: DisplayOption(manifest.service.env.0.map(|env_map| {
-            let mut environment = IndexMap::new();
-            for (k, v) in env_map.0 {
-                environment.insert(k, v.clone());
-            }
-            DisplayHashMap(environment)
-        })),
-        secrets: manifest.service.secrets.clone(),
-        command: manifest.service.command.clone(),
-    };
-
-    Ok(ComposeFile {
-        version: 2,
-        services: vec![service],
-    })
+    // Try to parse as new compose format
+    match serde_yaml::from_str::<ComposeFile>(&file_content) {
+        Ok(compose) => Ok(compose),
+        Err(e) => Err(anyhow!("Failed to parse manifest: {}", e)),
+    }
 }
 
 fn write_manifest(path: &str, compose: &ComposeFile) -> Result<()> {
