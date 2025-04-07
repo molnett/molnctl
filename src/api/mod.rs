@@ -198,7 +198,7 @@ impl APIClient {
         project_name: &str,
         env_name: &str,
         name: &str,
-    ) -> anyhow::Result<Option<Service>> {
+    ) -> anyhow::Result<Option<ComposeService>> {
         let url = format!(
             "{}/tenants/{}/projects/{}/environments/{}/services/{}",
             self.base_url, tenant_name, project_name, env_name, name
@@ -228,8 +228,8 @@ impl APIClient {
             "{}/tenants/{}/projects/{}/environments/{}/services",
             self.base_url, tenant_name, project_name, env_name
         );
-        let response: String = self.get(&url, token)?.error_for_status()?.text()?;
-        serde_json::from_str(response.as_str()).with_context(|| "Failed to deserialize response")
+        let response = self.get(&url, token)?.error_for_status()?;
+        serde_json::from_str(&response.text()?).with_context(|| "Failed to deserialize response")
     }
 
     pub fn deploy_service(
@@ -238,7 +238,7 @@ impl APIClient {
         tenant_name: &str,
         project_name: &str,
         env_name: &str,
-        service: Service,
+        service: &ComposeService,
     ) -> anyhow::Result<DeployServiceResponse> {
         let url = format!(
             "{}/tenants/{}/projects/{}/environments/{}/services",
