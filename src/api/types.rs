@@ -202,9 +202,6 @@ pub struct Secret {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct DisplayHashMap<T>(pub IndexMap<String, T>);
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct DisplayOption<T>(pub Option<T>);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -212,27 +209,6 @@ pub struct DisplayVec<T>(pub Vec<T>);
 
 fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     t == &T::default()
-}
-
-impl<T: Display> Display for DisplayOption<DisplayHashMap<T>> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if self.0.is_none() {
-            return Ok(());
-        }
-
-        let hashmap = self.0.as_ref().unwrap();
-        let mut entries = hashmap.0.iter().peekable();
-
-        while let Some((key, value)) = entries.next() {
-            write!(f, "{}: {}", key, value)?;
-
-            if entries.peek().is_some() {
-                write!(f, ", ")?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl<T: Display> Display for DisplayOption<T> {
