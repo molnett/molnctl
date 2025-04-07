@@ -298,9 +298,9 @@ impl Initialize {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct ComposeFile {
-    version: u16,
-    services: Vec<ComposeService>,
+pub struct ComposeFile {
+    pub version: u16,
+    pub services: Vec<ComposeService>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -698,7 +698,7 @@ impl Logs {
     }
 }
 
-fn read_manifest(path: &str) -> Result<ComposeFile> {
+pub fn read_manifest(path: &str) -> Result<ComposeFile> {
     let mut file_content = String::new();
     File::open(path)?.read_to_string(&mut file_content)?;
 

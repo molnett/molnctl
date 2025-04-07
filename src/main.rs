@@ -11,6 +11,8 @@ use serde_json::Value;
 mod api;
 mod commands;
 mod config;
+#[cfg(test)]
+mod manifest_test;
 
 #[derive(Debug, Parser)]
 #[command(

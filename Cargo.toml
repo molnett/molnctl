@@ -24,6 +24,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = { version = "1.0.114", features = ["preserve_order"] }
 serde_yaml = "0.9.25"
 tabled = "0.14.0"
+tempfile = "3.10.1"
 term = "0.7.0"
 thiserror = "1.0.48"
 time = { version = "0.3.36", features = ["serde", "serde-well-known"] }
