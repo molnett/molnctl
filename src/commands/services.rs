@@ -518,6 +518,8 @@ fn get_image_tag(tag: &Option<String>) -> Result<String> {
 pub struct ImageName {
     #[arg(help = "The service name to update")]
     service: String,
+    #[arg(short, long, help = "Container name to update (within the service)")]
+    container: Option<String>,
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
     #[arg(short, long, help = "Path to a manifest file.")]
@@ -552,20 +554,37 @@ impl ImageName {
                 .find(|s| s.name == self.service)
                 .ok_or_else(|| anyhow!("Service {} not found in compose file", &self.service))?;
 
-            // Update the image in the first container or create one if none exists
-            if let Some(container) = service.containers.0.first_mut() {
-                container.image = full_image.clone();
+            // If container name specified, update that specific container
+            if let Some(container_name) = &self.container {
+                let container = service
+                    .containers
+                    .0
+                    .iter_mut()
+                    .find(|c| c.name == *container_name);
+                
+                match container {
+                    Some(container) => {
+                        container.image = full_image.clone();
+                        println!("Updated container '{}' in service '{}'", container_name, self.service);
+                    }
+                    None => return Err(anyhow!("Container '{}' not found in service '{}'", container_name, self.service)),
+                }
             } else {
-                service.containers.0.push(Container {
-                    name: format!("{}-main", &self.service),
-                    image: full_image.clone(),
-                    container_type: String::new(),
-                    shared_volume_path: String::new(),
-                    ports: Vec::new(),
-                    environment: IndexMap::new(),
-                    secrets: IndexMap::new(),
-                    command: Vec::new(),
-                });
+                // Update the image in the first container or create one if none exists
+                if let Some(container) = service.containers.0.first_mut() {
+                    container.image = full_image.clone();
+                } else {
+                    service.containers.0.push(Container {
+                        name: format!("{}-main", &self.service),
+                        image: full_image.clone(),
+                        container_type: String::new(),
+                        shared_volume_path: String::new(),
+                        ports: Vec::new(),
+                        environment: IndexMap::new(),
+                        secrets: IndexMap::new(),
+                        command: Vec::new(),
+                    });
+                }
             }
 
             write_manifest(&path, &compose)?;
