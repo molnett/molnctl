@@ -89,11 +89,30 @@ pub struct NonComposeManifest {
     pub services: Vec<Container>,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
+pub struct Volume {
+    pub name: String,
+}
+
+impl Display for Volume {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Tabled)]
 pub struct ComposeService {
     pub name: String,
     #[serde(default)]
     pub containers: DisplayVec<Container>,
+    #[serde(default)]
+    pub volumes: DisplayVec<Volume>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
+pub struct VolumeMount {
+    pub volume_name: String,
+    pub path: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
@@ -116,6 +135,8 @@ pub struct Container {
     pub secrets: IndexMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ports: Vec<Port>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub volume_mounts: Vec<VolumeMount>,
 }
 
 impl Display for Container {

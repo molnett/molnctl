@@ -6,7 +6,9 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::tempdir;
 
-use crate::api::types::{ComposeService, Container, DisplayVec, NonComposeManifest, Port};
+use crate::api::types::{
+    ComposeService, Container, DisplayVec, NonComposeManifest, Port, Volume, VolumeMount,
+};
 use crate::commands::services::{read_manifest, ComposeFile};
 
 #[cfg(test)]
@@ -48,6 +50,7 @@ mod tests {
                         target: 80,
                         publish: Some(true),
                     }],
+                    volume_mounts: vec![],
                 },
                 Container {
                     name: "api".to_string(),
@@ -65,6 +68,7 @@ mod tests {
                         target: 3000,
                         publish: Some(true),
                     }],
+                    volume_mounts: vec![],
                 },
             ],
         };
@@ -75,6 +79,7 @@ mod tests {
             services: vec![
                 ComposeService {
                     name: "web".to_string(),
+                    volumes: DisplayVec(vec![]),
                     containers: DisplayVec(vec![Container {
                         name: "main".to_string(),
                         image: "nginx:latest".to_string(),
@@ -87,10 +92,12 @@ mod tests {
                             target: 80,
                             publish: Some(true),
                         }],
+                        volume_mounts: vec![],
                     }]),
                 },
                 ComposeService {
                     name: "api".to_string(),
+                    volumes: DisplayVec(vec![]),
                     containers: DisplayVec(vec![
                         Container {
                             name: "main".to_string(),
@@ -108,6 +115,7 @@ mod tests {
                                 target: 3000,
                                 publish: Some(true),
                             }],
+                            volume_mounts: vec![],
                         },
                         Container {
                             name: "redis".to_string(),
@@ -121,6 +129,7 @@ mod tests {
                                 target: 6379,
                                 publish: None,
                             }],
+                            volume_mounts: vec![],
                         },
                     ]),
                 },
@@ -204,6 +213,7 @@ mod tests {
                     target: 8080,
                     publish: Some(true),
                 }],
+                volume_mounts: vec![],
             }],
         };
 
@@ -212,6 +222,7 @@ mod tests {
             version: 1,
             services: vec![ComposeService {
                 name: "app".to_string(),
+                volumes: DisplayVec(vec![]),
                 containers: DisplayVec(vec![
                     Container {
                         name: "main".to_string(),
@@ -229,6 +240,7 @@ mod tests {
                             target: 8080,
                             publish: Some(true),
                         }],
+                        volume_mounts: vec![],
                     },
                     Container {
                         // Added sidecar container
@@ -240,6 +252,7 @@ mod tests {
                         environment: IndexMap::new(),
                         secrets: IndexMap::new(),
                         ports: vec![],
+                        volume_mounts: vec![],
                     },
                 ]),
             }],
@@ -322,6 +335,129 @@ mod tests {
             found_sidecar_addition,
             "Failed to detect sidecar container addition"
         );
+
+        Ok(())
+    }
+
+    // Test volumes and volume mounts
+    #[test]
+    fn test_volumes_and_mounts() -> Result<()> {
+        // Create a temporary directory
+        let temp_dir = tempdir()?;
+
+        // Create a manifest with volumes and volume mounts
+        let manifest = ComposeFile {
+            version: 1,
+            services: vec![ComposeService {
+                name: "app".to_string(),
+                volumes: DisplayVec(vec![
+                    Volume {
+                        name: "app_data".to_string(),
+                    },
+                    Volume {
+                        name: "shared_logs".to_string(),
+                    },
+                ]),
+                containers: DisplayVec(vec![
+                    Container {
+                        name: "main".to_string(),
+                        image: "app:latest".to_string(),
+                        container_type: "main".to_string(),
+                        shared_volume_path: "/app/data".to_string(),
+                        command: vec![],
+                        environment: IndexMap::new(),
+                        secrets: IndexMap::new(),
+                        ports: vec![],
+                        volume_mounts: vec![
+                            VolumeMount {
+                                volume_name: "app_data".to_string(),
+                                path: "/app/data".to_string(),
+                            },
+                            VolumeMount {
+                                volume_name: "./logs".to_string(),
+                                path: "/app/logs".to_string(),
+                            },
+                        ],
+                    },
+                    Container {
+                        name: "sidecar".to_string(),
+                        image: "logger:latest".to_string(),
+                        container_type: "helper".to_string(),
+                        shared_volume_path: "/logs".to_string(),
+                        command: vec![],
+                        environment: IndexMap::new(),
+                        secrets: IndexMap::new(),
+                        ports: vec![],
+                        volume_mounts: vec![
+                            VolumeMount {
+                                volume_name: "shared_logs".to_string(),
+                                path: "/logs".to_string(),
+                            },
+                            VolumeMount {
+                                volume_name: "./logs".to_string(),
+                                path: "/backup".to_string(),
+                            },
+                        ],
+                    },
+                ]),
+            }],
+        };
+
+        // Write manifest to a temporary file
+        let manifest_path = write_temp_yaml(&manifest, &temp_dir, "volumes_test.yaml")?;
+
+        // Read the manifest back
+        let read_manifest = read_manifest(&manifest_path)?;
+
+        // Verify the volumes were parsed correctly
+        assert_eq!(read_manifest.services.len(), 1);
+        let app_service = &read_manifest.services[0];
+        assert_eq!(app_service.name, "app");
+
+        // Check volumes at service level
+        assert_eq!(app_service.volumes.0.len(), 2);
+        assert!(app_service.volumes.0.iter().any(|v| v.name == "app_data"));
+        assert!(app_service
+            .volumes
+            .0
+            .iter()
+            .any(|v| v.name == "shared_logs"));
+
+        // Check main container volume mounts
+        let main_container = app_service
+            .containers
+            .0
+            .iter()
+            .find(|c| c.name == "main")
+            .unwrap();
+        assert_eq!(main_container.volume_mounts.len(), 2);
+        assert!(main_container
+            .volume_mounts
+            .iter()
+            .any(|vm| vm.volume_name == "app_data" && vm.path == "/app/data"));
+        assert!(main_container
+            .volume_mounts
+            .iter()
+            .any(|vm| vm.volume_name == "./logs" && vm.path == "/app/logs"));
+        assert_eq!(main_container.shared_volume_path, "/app/data");
+
+        // Check sidecar container volume mounts
+        let sidecar_container = app_service
+            .containers
+            .0
+            .iter()
+            .find(|c| c.name == "sidecar")
+            .unwrap();
+        assert_eq!(sidecar_container.volume_mounts.len(), 2);
+        assert!(sidecar_container
+            .volume_mounts
+            .iter()
+            .any(|vm| vm.volume_name == "shared_logs" && vm.path == "/logs"));
+        assert!(sidecar_container
+            .volume_mounts
+            .iter()
+            .any(|vm| vm.volume_name == "./logs" && vm.path == "/backup"));
+        assert_eq!(sidecar_container.shared_volume_path, "/logs");
 
         Ok(())
     }

@@ -373,6 +373,7 @@ impl ComposeBuilder {
                 image: full_image,
                 container_type: String::new(),
                 shared_volume_path: String::new(),
+                volume_mounts: vec![],
                 ports: vec![Port {
                     target: container_port,
                     publish: Some(true),
@@ -462,6 +463,7 @@ impl ComposeBuilder {
             let service = ComposeService {
                 name: service_name,
                 containers: DisplayVec(vec![container]),
+                volumes: DisplayVec(vec![]),
             };
 
             self.compose.services.push(service);
@@ -561,13 +563,22 @@ impl ImageName {
                     .0
                     .iter_mut()
                     .find(|c| c.name == *container_name);
-                
+
                 match container {
                     Some(container) => {
                         container.image = full_image.clone();
-                        println!("Updated container '{}' in service '{}'", container_name, self.service);
+                        println!(
+                            "Updated container '{}' in service '{}'",
+                            container_name, self.service
+                        );
                     }
-                    None => return Err(anyhow!("Container '{}' not found in service '{}'", container_name, self.service)),
+                    None => {
+                        return Err(anyhow!(
+                            "Container '{}' not found in service '{}'",
+                            container_name,
+                            self.service
+                        ))
+                    }
                 }
             } else {
                 // Update the image in the first container or create one if none exists
@@ -583,6 +594,7 @@ impl ImageName {
                         environment: IndexMap::new(),
                         secrets: IndexMap::new(),
                         command: Vec::new(),
+                        volume_mounts: vec![],
                     });
                 }
             }
@@ -738,6 +750,7 @@ pub fn read_manifest(path: &str) -> Result<ComposeFile> {
                 let new_service = ComposeService {
                     name: old_service.name,
                     containers: DisplayVec(vec![container]),
+                    volumes: DisplayVec(vec![]),
                 };
 
                 new_services.push(new_service);
