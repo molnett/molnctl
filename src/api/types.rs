@@ -115,11 +115,19 @@ pub struct VolumeMount {
     pub path: String,
 }
 
+fn default_container_type() -> String {
+    "main".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
 pub struct Container {
     pub name: String,
     pub image: String,
-    #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
+    #[serde(
+        rename = "type",
+        default = "default_container_type",
+        skip_serializing_if = "String::is_empty"
+    )]
     pub container_type: String,
     #[serde(
         rename = "shared_volume_path",
@@ -137,6 +145,10 @@ pub struct Container {
     pub ports: Vec<Port>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volume_mounts: Vec<VolumeMount>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub cpu: u32,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub memory: u32,
 }
 
 impl Display for Container {
@@ -155,7 +167,7 @@ impl Tabled for Container {
             self.ports
                 .iter()
                 .map(|p| match p.publish {
-                    Some(true) => format!("{} (published)", p.target),
+                    true => format!("{} (published)", p.target),
                     _ => format!("{}", p.target),
                 })
                 .collect::<Vec<_>>()
@@ -197,8 +209,8 @@ impl Tabled for Container {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Port {
     pub target: u16,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub publish: Option<bool>,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub publish: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -250,4 +262,8 @@ impl<T: Display> Display for DisplayVec<T> {
             write!(f, "{}", strings.join(" "))
         }
     }
+}
+
+fn is_zero(num: &u32) -> bool {
+    *num == 0
 }
