@@ -1,9 +1,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 use tempfile::tempdir;
 
 use crate::api::types::{
@@ -48,9 +46,11 @@ mod tests {
                     secrets: IndexMap::new(),
                     ports: vec![Port {
                         target: 80,
-                        publish: Some(true),
+                        publish: true,
                     }],
                     volume_mounts: vec![],
+                    cpu: 1,
+                    memory: 1024,
                 },
                 Container {
                     name: "api".to_string(),
@@ -66,9 +66,11 @@ mod tests {
                     secrets: IndexMap::new(),
                     ports: vec![Port {
                         target: 3000,
-                        publish: Some(true),
+                        publish: true,
                     }],
                     volume_mounts: vec![],
+                    cpu: 1,
+                    memory: 1024,
                 },
             ],
         };
@@ -90,9 +92,11 @@ mod tests {
                         secrets: IndexMap::new(),
                         ports: vec![Port {
                             target: 80,
-                            publish: Some(true),
+                            publish: true,
                         }],
                         volume_mounts: vec![],
+                        cpu: 1,
+                        memory: 1024,
                     }]),
                 },
                 ComposeService {
@@ -113,9 +117,11 @@ mod tests {
                             secrets: IndexMap::new(),
                             ports: vec![Port {
                                 target: 3000,
-                                publish: Some(true),
+                                publish: true,
                             }],
                             volume_mounts: vec![],
+                            cpu: 1,
+                            memory: 1024,
                         },
                         Container {
                             name: "redis".to_string(),
@@ -127,9 +133,11 @@ mod tests {
                             secrets: IndexMap::new(),
                             ports: vec![Port {
                                 target: 6379,
-                                publish: None,
+                                publish: false,
                             }],
                             volume_mounts: vec![],
+                            cpu: 1,
+                            memory: 1024,
                         },
                     ]),
                 },
@@ -211,9 +219,11 @@ mod tests {
                 secrets: IndexMap::new(),
                 ports: vec![Port {
                     target: 8080,
-                    publish: Some(true),
+                    publish: true,
                 }],
                 volume_mounts: vec![],
+                cpu: 1,
+                memory: 1024,
             }],
         };
 
@@ -238,9 +248,11 @@ mod tests {
                         secrets: IndexMap::new(),
                         ports: vec![Port {
                             target: 8080,
-                            publish: Some(true),
+                            publish: true,
                         }],
                         volume_mounts: vec![],
+                        cpu: 1,
+                        memory: 1024,
                     },
                     Container {
                         // Added sidecar container
@@ -253,6 +265,8 @@ mod tests {
                         secrets: IndexMap::new(),
                         ports: vec![],
                         volume_mounts: vec![],
+                        cpu: 1,
+                        memory: 1024,
                     },
                 ]),
             }],
@@ -368,6 +382,8 @@ mod tests {
                         environment: IndexMap::new(),
                         secrets: IndexMap::new(),
                         ports: vec![],
+                        cpu: 1,
+                        memory: 1024,
                         volume_mounts: vec![
                             VolumeMount {
                                 volume_name: "app_data".to_string(),
@@ -388,6 +404,8 @@ mod tests {
                         environment: IndexMap::new(),
                         secrets: IndexMap::new(),
                         ports: vec![],
+                        cpu: 1,
+                        memory: 1024,
                         volume_mounts: vec![
                             VolumeMount {
                                 volume_name: "shared_logs".to_string(),

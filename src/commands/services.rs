@@ -371,16 +371,11 @@ impl ComposeBuilder {
             let mut container = Container {
                 name: container_name,
                 image: full_image,
-                container_type: String::new(),
-                shared_volume_path: String::new(),
-                volume_mounts: vec![],
                 ports: vec![Port {
                     target: container_port,
-                    publish: Some(true),
+                    publish: true,
                 }],
-                environment: IndexMap::new(),
-                secrets: IndexMap::new(),
-                command: Vec::new(),
+                ..Default::default()
             };
 
             // Ask for entrypoint
@@ -588,13 +583,7 @@ impl ImageName {
                     service.containers.0.push(Container {
                         name: format!("{}-main", &self.service),
                         image: full_image.clone(),
-                        container_type: String::new(),
-                        shared_volume_path: String::new(),
-                        ports: Vec::new(),
-                        environment: IndexMap::new(),
-                        secrets: IndexMap::new(),
-                        command: Vec::new(),
-                        volume_mounts: vec![],
+                        ..Default::default()
                     });
                 }
             }
@@ -744,7 +733,7 @@ pub fn read_manifest(path: &str) -> Result<ComposeFile> {
             for old_service in hybrid.services {
                 let mut container = old_service.clone();
                 container.name = "main".to_string();
-                container.ports[0].publish = Some(true);
+                container.ports[0].publish = true;
                 container.container_type = "main".to_string();
 
                 let new_service = ComposeService {
