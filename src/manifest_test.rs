@@ -5,7 +5,7 @@ use std::io::Write;
 use tempfile::tempdir;
 
 use crate::api::types::{
-    ComposeService, Container, DisplayVec, NonComposeManifest, Port, Volume, VolumeMount,
+    ComposeService, Container, DisplayVec, HostAlias, NonComposeManifest, Port, Volume, VolumeMount,
 };
 use crate::commands::services::{read_manifest, ComposeFile};
 
@@ -82,62 +82,50 @@ mod tests {
                 ComposeService {
                     name: "web".to_string(),
                     volumes: DisplayVec(vec![]),
+                    host_aliases: DisplayVec(vec![]),
                     containers: DisplayVec(vec![Container {
                         name: "main".to_string(),
                         image: "nginx:latest".to_string(),
                         container_type: "main".to_string(),
                         shared_volume_path: "".to_string(),
-                        command: vec![],
-                        environment: IndexMap::new(),
-                        secrets: IndexMap::new(),
                         ports: vec![Port {
                             target: 80,
                             publish: true,
                         }],
-                        volume_mounts: vec![],
-                        cpu: 1,
-                        memory: 1024,
+                        ..Default::default()
                     }]),
                 },
                 ComposeService {
                     name: "api".to_string(),
                     volumes: DisplayVec(vec![]),
+                    host_aliases: DisplayVec(vec![]),
                     containers: DisplayVec(vec![
                         Container {
                             name: "main".to_string(),
                             image: "node:14".to_string(),
                             container_type: "main".to_string(),
-                            shared_volume_path: "".to_string(),
                             command: vec!["node".to_string(), "server.js".to_string()],
                             environment: {
                                 let mut env = IndexMap::new();
                                 env.insert("NODE_ENV".to_string(), "production".to_string());
                                 env
                             },
-                            secrets: IndexMap::new(),
                             ports: vec![Port {
                                 target: 3000,
                                 publish: true,
                             }],
-                            volume_mounts: vec![],
-                            cpu: 1,
-                            memory: 1024,
+                            ..Default::default()
                         },
                         Container {
                             name: "redis".to_string(),
                             image: "redis:alpine".to_string(),
                             container_type: "cache".to_string(),
                             shared_volume_path: "/data".to_string(),
-                            command: vec![],
-                            environment: IndexMap::new(),
-                            secrets: IndexMap::new(),
                             ports: vec![Port {
                                 target: 6379,
                                 publish: false,
                             }],
-                            volume_mounts: vec![],
-                            cpu: 1,
-                            memory: 1024,
+                            ..Default::default()
                         },
                     ]),
                 },
@@ -233,26 +221,23 @@ mod tests {
             services: vec![ComposeService {
                 name: "app".to_string(),
                 volumes: DisplayVec(vec![]),
+                host_aliases: DisplayVec(vec![]),
                 containers: DisplayVec(vec![
                     Container {
                         name: "main".to_string(),
                         image: "app:v2".to_string(), // Changed image version
                         container_type: "main".to_string(),
-                        shared_volume_path: "".to_string(),
                         command: vec![],
                         environment: {
                             let mut env = IndexMap::new();
                             env.insert("DEBUG".to_string(), "true".to_string()); // Changed env var
                             env
                         },
-                        secrets: IndexMap::new(),
                         ports: vec![Port {
                             target: 8080,
                             publish: true,
                         }],
-                        volume_mounts: vec![],
-                        cpu: 1,
-                        memory: 1024,
+                        ..Default::default()
                     },
                     Container {
                         // Added sidecar container
@@ -260,13 +245,7 @@ mod tests {
                         image: "sidecar:latest".to_string(),
                         container_type: "helper".to_string(),
                         shared_volume_path: "/shared".to_string(),
-                        command: vec![],
-                        environment: IndexMap::new(),
-                        secrets: IndexMap::new(),
-                        ports: vec![],
-                        volume_mounts: vec![],
-                        cpu: 1,
-                        memory: 1024,
+                        ..Default::default()
                     },
                 ]),
             }],
@@ -372,18 +351,13 @@ mod tests {
                         name: "shared_logs".to_string(),
                     },
                 ]),
+                host_aliases: DisplayVec(vec![]),
                 containers: DisplayVec(vec![
                     Container {
                         name: "main".to_string(),
                         image: "app:latest".to_string(),
                         container_type: "main".to_string(),
                         shared_volume_path: "/app/data".to_string(),
-                        command: vec![],
-                        environment: IndexMap::new(),
-                        secrets: IndexMap::new(),
-                        ports: vec![],
-                        cpu: 1,
-                        memory: 1024,
                         volume_mounts: vec![
                             VolumeMount {
                                 volume_name: "app_data".to_string(),
@@ -394,18 +368,13 @@ mod tests {
                                 path: "/app/logs".to_string(),
                             },
                         ],
+                        ..Default::default()
                     },
                     Container {
                         name: "sidecar".to_string(),
                         image: "logger:latest".to_string(),
                         container_type: "helper".to_string(),
                         shared_volume_path: "/logs".to_string(),
-                        command: vec![],
-                        environment: IndexMap::new(),
-                        secrets: IndexMap::new(),
-                        ports: vec![],
-                        cpu: 1,
-                        memory: 1024,
                         volume_mounts: vec![
                             VolumeMount {
                                 volume_name: "shared_logs".to_string(),
@@ -416,6 +385,7 @@ mod tests {
                                 path: "/backup".to_string(),
                             },
                         ],
+                        ..Default::default()
                     },
                 ]),
             }],
@@ -476,6 +446,139 @@ mod tests {
             .iter()
             .any(|vm| vm.volume_name == "./logs" && vm.path == "/backup"));
         assert_eq!(sidecar_container.shared_volume_path, "/logs");
+
+        Ok(())
+    }
+
+    // Test CPU and memory settings
+    #[test]
+    fn test_cpu_and_memory() -> Result<()> {
+        // Create a temporary directory
+        let temp_dir = tempdir()?;
+
+        // Create a manifest with different CPU and memory settings
+        let manifest = ComposeFile {
+            version: 1,
+            services: vec![ComposeService {
+                name: "resource_test".to_string(),
+                volumes: DisplayVec(vec![]),
+                host_aliases: DisplayVec(vec![]),
+                containers: DisplayVec(vec![
+                    Container {
+                        name: "high_resource".to_string(),
+                        image: "heavy-app:latest".to_string(),
+                        container_type: "main".to_string(),
+                        cpu: 4,
+                        memory: 8192,
+                        ..Default::default()
+                    },
+                    Container {
+                        name: "low_resource".to_string(),
+                        image: "light-app:latest".to_string(),
+                        container_type: "helper".to_string(),
+                        cpu: 1,
+                        memory: 512,
+                        ..Default::default()
+                    },
+                ]),
+            }],
+        };
+
+        // Write manifest to a temporary file
+        let manifest_path = write_temp_yaml(&manifest, &temp_dir, "resources_test.yaml")?;
+
+        // Read the manifest back
+        let read_manifest = read_manifest(&manifest_path)?;
+
+        // Verify the resources were parsed correctly
+        assert_eq!(read_manifest.services.len(), 1);
+        let service = &read_manifest.services[0];
+        assert_eq!(service.name, "resource_test");
+
+        // Check high resource container
+        let high_container = service
+            .containers
+            .0
+            .iter()
+            .find(|c| c.name == "high_resource")
+            .unwrap();
+        assert_eq!(high_container.cpu, 4);
+        assert_eq!(high_container.memory, 8192);
+
+        // Check low resource container
+        let low_container = service
+            .containers
+            .0
+            .iter()
+            .find(|c| c.name == "low_resource")
+            .unwrap();
+        assert_eq!(low_container.cpu, 1);
+        assert_eq!(low_container.memory, 512);
+
+        Ok(())
+    }
+
+    // Test host aliases
+    #[test]
+    fn test_host_aliases() -> Result<()> {
+        // Create a temporary directory
+        let temp_dir = tempdir()?;
+
+        // Create a manifest with host aliases
+        let manifest = ComposeFile {
+            version: 1,
+            services: vec![ComposeService {
+                name: "networking_test".to_string(),
+                volumes: DisplayVec(vec![]),
+                host_aliases: DisplayVec(vec![
+                    HostAlias {
+                        ip: "192.168.1.10".to_string(),
+                        hostnames: DisplayVec(vec!["db.local".to_string()]),
+                    },
+                    HostAlias {
+                        ip: "192.168.1.11".to_string(),
+                        hostnames: DisplayVec(vec!["cache.local".to_string()]),
+                    },
+                ]),
+                containers: DisplayVec(vec![Container {
+                    name: "web".to_string(),
+                    image: "webapp:latest".to_string(),
+                    container_type: "main".to_string(),
+                    ..Default::default()
+                }]),
+            }],
+        };
+
+        // Write manifest to a temporary file
+        let manifest_path = write_temp_yaml(&manifest, &temp_dir, "host_aliases_test.yaml")?;
+
+        // Read the manifest back
+        let read_manifest = read_manifest(&manifest_path)?;
+
+        // Verify the host aliases were parsed correctly
+        assert_eq!(read_manifest.services.len(), 1);
+        let service = &read_manifest.services[0];
+        assert_eq!(service.name, "networking_test");
+
+        // Check host aliases
+        assert_eq!(service.host_aliases.0.len(), 2);
+
+        // Find aliases by IP
+        let db_alias = service
+            .host_aliases
+            .0
+            .iter()
+            .find(|ha| ha.ip == "192.168.1.10")
+            .unwrap();
+        assert_eq!(db_alias.hostnames.0[0], "db.local");
+
+        let cache_alias = service
+            .host_aliases
+            .0
+            .iter()
+            .find(|ha| ha.ip == "192.168.1.11")
+            .unwrap();
+        assert_eq!(cache_alias.hostnames.0[0], "cache.local");
 
         Ok(())
     }

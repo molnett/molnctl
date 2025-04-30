@@ -100,6 +100,18 @@ impl Display for Volume {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
+pub struct HostAlias {
+    pub ip: String,
+    pub hostnames: DisplayVec<String>,
+}
+
+impl Display for HostAlias {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}: {}", self.ip, self.hostnames)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Tabled)]
 pub struct ComposeService {
     pub name: String,
@@ -107,6 +119,8 @@ pub struct ComposeService {
     pub containers: DisplayVec<Container>,
     #[serde(default)]
     pub volumes: DisplayVec<Volume>,
+    #[serde(default)]
+    pub host_aliases: DisplayVec<HostAlias>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
