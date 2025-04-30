@@ -145,10 +145,26 @@ pub struct Container {
     pub ports: Vec<Port>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volume_mounts: Vec<VolumeMount>,
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default = "default_cpu", skip_serializing_if = "is_default_cpu")]
     pub cpu: u32,
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default = "default_memory", skip_serializing_if = "is_default_memory")]
     pub memory: u32,
+}
+
+fn default_cpu() -> u32 {
+    1
+}
+
+fn default_memory() -> u32 {
+    1024
+}
+
+fn is_default_cpu(cpu: &u32) -> bool {
+    *cpu == 1
+}
+
+fn is_default_memory(memory: &u32) -> bool {
+    *memory == 1024
 }
 
 impl Display for Container {
@@ -262,8 +278,4 @@ impl<T: Display> Display for DisplayVec<T> {
             write!(f, "{}", strings.join(" "))
         }
     }
-}
-
-fn is_zero(num: &u32) -> bool {
-    *num == 0
 }
