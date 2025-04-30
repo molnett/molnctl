@@ -459,6 +459,7 @@ impl ComposeBuilder {
                 name: service_name,
                 containers: DisplayVec(vec![container]),
                 volumes: DisplayVec(vec![]),
+                host_aliases: DisplayVec(vec![]),
             };
 
             self.compose.services.push(service);
@@ -740,6 +741,7 @@ pub fn read_manifest(path: &str) -> Result<ComposeFile> {
                     name: old_service.name,
                     containers: DisplayVec(vec![container]),
                     volumes: DisplayVec(vec![]),
+                    host_aliases: DisplayVec(vec![]),
                 };
 
                 new_services.push(new_service);
