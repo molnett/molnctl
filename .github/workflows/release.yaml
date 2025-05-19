@@ -14,7 +14,7 @@ jobs:
       matrix:
         # a list of all the targets
         include:
-          - TARGET: x86_64-unknown-linux-gnu # tested in a debian container on a mac
+          - TARGET: x86_64-unknown-linux-musl # Using MUSL for Linux
             OS: ubuntu-24.04
           - TARGET: x86_64-apple-darwin # tested on a mac
             OS: macos-15
@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
       - name: Cargo cache
         uses: actions/cache@v4
         with:
@@ -38,13 +39,10 @@ jobs:
             ./target
           key: build-cargo-registry-${{matrix.TARGET}}
 
-      - name: Install and configure dependencies
-        run: |
-          # dependencies are only needed on ubuntu as that's the only place where
-          # we make cross-compilation
-          if [[ $OS =~ ^ubuntu.*$ ]]; then
-            sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
-          fi
+      - uses: mlugg/setup-zig@aa9ad5c14eb3452e235a441c4f9a8e89f20d97bd
+
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -52,7 +50,12 @@ jobs:
           target: $TARGET
 
       - name: Generate the artifacts
-        run: cargo build --release --target $TARGET
+        run: |
+          if [[ $TARGET == *-linux-musl ]]; then
+            cargo zigbuild --release --target $TARGET
+          else
+            cargo build --release --target $TARGET
+          fi
 
       - name: Move files
         run: |
