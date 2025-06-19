@@ -44,6 +44,7 @@ impl Services {
             Some(Commands::ImageName(image_name)) => image_name.execute(base),
             Some(Commands::List(list)) => list.execute(base),
             Some(Commands::Delete(delete)) => delete.execute(base),
+            Some(Commands::GetURL(get_url)) => get_url.execute(base),
             None => Ok(()),
         }
     }
@@ -61,6 +62,9 @@ pub enum Commands {
     List(List),
     /// Delete a service
     Delete(Delete),
+    /// Get the URL of a service
+    #[command(name = "get-url")]
+    GetURL(GetURL),
 }
 
 #[derive(Debug, Parser)]
@@ -768,4 +772,36 @@ fn write_manifest(path: &str, compose: &ComposeFile) -> Result<()> {
     let yaml = serde_yaml::to_string(compose)?;
     file.write_all(yaml.as_bytes())?;
     Ok(())
+}
+
+#[derive(Debug, Parser)]
+pub struct GetURL {
+    #[arg(help = "Name of the service")]
+    name: String,
+    #[arg(long, help = "Environment the service is in")]
+    env: String,
+}
+
+impl GetURL {
+    pub fn execute(self, base: CommandBase) -> Result<()> {
+        let tenant_name = base.get_tenant()?;
+        let project_name = base.get_project()?;
+        let token = base
+            .user_config()
+            .get_token()
+            .ok_or_else(|| anyhow!("No token found. Please login first."))?;
+
+        let response = base
+            .api_client()
+            .get_services(token, &tenant_name, &project_name, &self.env)?;
+
+        let service = response
+            .services
+            .iter()
+            .find(|s| s.name == self.name)
+            .ok_or_else(|| anyhow!("Service '{}' not found in environment '{}'", self.name, self.env))?;
+
+        println!("{}", service.url);
+        Ok(())
+    }
 }

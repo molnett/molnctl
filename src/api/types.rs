@@ -136,6 +136,7 @@ pub struct ServiceResponse {
     #[serde(default)]
     pub host_aliases: DisplayVec<HostAlias>,
 
+    #[serde(default)]
     pub url: String,
 }
 
