@@ -64,7 +64,7 @@ pub struct CreateEnvironmentResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListServicesResponse {
-    pub services: Vec<ComposeService>,
+    pub services: Vec<ServiceResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -121,6 +121,23 @@ pub struct ComposeService {
     pub volumes: DisplayVec<Volume>,
     #[serde(default)]
     pub host_aliases: DisplayVec<HostAlias>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Tabled)]
+pub struct ServiceResponse {
+    pub name: String,
+
+    #[serde(default)]
+    pub containers: DisplayVec<Container>,
+
+    #[serde(default)]
+    pub volumes: DisplayVec<Volume>,
+
+    #[serde(default)]
+    pub host_aliases: DisplayVec<HostAlias>,
+
+    #[serde(default)]
+    pub url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Default)]
