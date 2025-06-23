@@ -520,7 +520,7 @@ fn get_image_tag(tag: &Option<String>) -> Result<String> {
 pub struct ImageName {
     #[arg(help = "The service name to update")]
     service: String,
-    #[arg(short, long, help = "Container name to update (within the service)")]
+    #[arg(long, help = "Container name to update (within the service)")]
     container: Option<String>,
     #[arg(short, long, help = "Image tag to use")]
     tag: Option<String>,
