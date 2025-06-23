@@ -115,7 +115,7 @@ impl Login {
 #[derive(Parser, Debug)]
 pub struct Docker {
     /// Docker registry URL
-    #[arg(long, default_value = "oci.se-ume.mltt.art")]
+    #[arg(long, default_value = "oci.se-ume.mltt.art", hide = true)]
     pub registry: String,
 }
 
