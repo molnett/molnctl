@@ -113,7 +113,11 @@ impl Login {
 }
 
 #[derive(Parser, Debug)]
-pub struct Docker {}
+pub struct Docker {
+    /// Docker registry URL
+    #[arg(long, default_value = "oci.se-ume.mltt.art", hide = true)]
+    pub registry: String,
+}
 
 impl Docker {
     pub fn execute(self, base: CommandBase) -> Result<()> {
@@ -128,7 +132,7 @@ impl Docker {
 
         let mut command = Command::new("docker")
             .arg("login")
-            .arg("oci.se-ume.mltt.art")
+            .arg(&self.registry)
             .arg("--username=x")
             .arg("--password-stdin")
             .stdin(Stdio::piped())
