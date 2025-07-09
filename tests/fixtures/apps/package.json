@@ -1,0 +1,8 @@
+{
+  "name": "molnctl-test",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'Building frontend...' && sleep 1 && echo 'Build complete!'",
+    "start": "echo 'Starting server...'"
+  }
+}

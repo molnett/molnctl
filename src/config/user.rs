@@ -54,7 +54,6 @@ impl UserConfig {
         let mut config =
             UserConfigLoader::load(&config_path).expect("Loading config from disk failed");
 
-        // TODO: write config to disk after reading so it gets written if it doesn't exist
 
         if let Some(h) = &cli.url {
             config.set_url(h.to_string());

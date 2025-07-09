@@ -11,8 +11,6 @@ use serde_json::Value;
 mod api;
 mod commands;
 mod config;
-#[cfg(test)]
-mod manifest_test;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -69,6 +67,8 @@ pub struct Cli {
 enum Commands {
     /// Login to Molnett
     Auth(commands::auth::Auth),
+    /// Build a container image from a Dockerfile
+    Build(commands::build::Build),
     /// Create and manage environments
     Environments(commands::environments::Environments),
     /// Deploy a service
@@ -107,6 +107,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Commands::Auth(auth)) => auth.execute(base),
+        Some(Commands::Build(build)) => build.execute(base),
         Some(Commands::Environments(environments)) => environments.execute(base),
         Some(Commands::Deploy(deploy)) => deploy.execute(base),
         Some(Commands::Logs(logs)) => logs.execute(base),

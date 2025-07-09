@@ -3,6 +3,7 @@ use anyhow::{anyhow, Result};
 use crate::{api::APIClient, config::user::UserConfig};
 
 pub mod auth;
+pub mod build;
 pub mod environments;
 pub mod projects;
 pub mod secrets;
