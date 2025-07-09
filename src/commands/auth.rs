@@ -96,7 +96,6 @@ impl Login {
         if let Some(refresh_token) = oauthtoken.refresh_token() {
             token.refresh_token = Some(refresh_token.secret().to_string());
         }
-        // TODO: the api returns "expiry":"2024-01-01T11:03:53.485518152+01:00"
         if let Some(expires_in) = oauthtoken.expires_in() {
             token.expiry =
                 Some(Utc::now() + chrono::Duration::seconds(expires_in.as_secs() as i64));
